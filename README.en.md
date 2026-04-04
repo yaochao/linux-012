@@ -1,6 +1,7 @@
 # Linux 0.12 on QEMU
 
 [中文 README](./README.md)
+[Changelog](./CHANGELOG.en.md)
 
 This repository does one specific thing: on a modern host, it builds the two runtime images required to boot Linux 0.12 under QEMU from source and repo-owned manifests, enters the shell, and verifies the result by running `ls`.
 
@@ -29,6 +30,8 @@ The build and runtime flow is:
 - run `ls`
 
 This is not a “download a historical image and boot it” repo. It is a “rebuild the runtime images locally and boot them” repo.
+
+Current formal release: `v1.0.0`
 
 ## Supported Hosts
 
