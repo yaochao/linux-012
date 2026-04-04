@@ -7,7 +7,7 @@
 仓库当前不再保存第三方运行时镜像。仓库里提交的是本项目自己编译出来的镜像快照：
 
 - `images/bootimage-0.12-hd`
-- `images/hdc-0.12.img`
+- `images/hdc-0.12.img.xz`
 
 同一套源码构建链还会在本地生成工作镜像：
 
@@ -23,7 +23,7 @@
 - 编译内核启动镜像
 - 编译仓库自带的最小用户态程序 `/bin/sh` 和 `/bin/ls`
 - 按仓库清单生成 Minix v1 根文件系统
-- 生成仓库内置镜像 `images/bootimage-0.12-hd` 和 `images/hdc-0.12.img`
+- 生成仓库内置镜像 `images/bootimage-0.12-hd` 和 `images/hdc-0.12.img.xz`
 - 启动 QEMU
 - 进入 `[/usr/root]#`
 - 执行 `ls`
@@ -113,7 +113,7 @@ Windows CMD：
 scripts\run.cmd
 ```
 
-这条入口直接使用仓库里的 `images/` 镜像，不会先重编源码。macOS / Ubuntu 下它保留当前的终端交互方式；Windows 下本来就是图形窗口。
+这条入口直接使用仓库里的 `images/` 快照，不会先重编源码。系统硬盘镜像会先自动解包到 `out/repo-images/hdc-0.12.img`，然后再启动。macOS / Ubuntu 下它保留当前的终端交互方式；Windows 下本来就是图形窗口。
 
 ### 4. 弹出可见的 QEMU 窗口并手动操作
 
@@ -161,7 +161,7 @@ Windows CMD：
 scripts\build-and-run.cmd
 ```
 
-这条入口会强制重新编译，完成后把新的镜像同步到 `images/`，然后启动 QEMU。
+这条入口会强制重新编译，完成后把新的镜像同步到 `images/`，其中硬盘镜像会以压缩快照形式写成 `images/hdc-0.12.img.xz`，然后启动 QEMU。
 
 如果你既要“从编译开始”，又要最后看到可交互的 QEMU 窗口，运行：
 
@@ -299,7 +299,8 @@ python3 rebuild/driver.py run
 - `rebuild/out/images/bootimage-0.12-hd`
 - `rebuild/out/images/hdc-0.12.img`
 - `images/bootimage-0.12-hd`
-- `images/hdc-0.12.img`
+- `images/hdc-0.12.img.xz`
+- `out/repo-images/hdc-0.12.img`
 - `out/verify/screen.txt`
 - `out/verify-userland/screen.txt`
 - `out/run/boot.img`
@@ -316,7 +317,7 @@ python3 rebuild/driver.py run
 6. 根据 `rebuild/rootfs/manifest/` 创建目录、设备节点和启动脚本
 7. 生成 Linux 0.12 可挂载的 Minix v1 根文件系统
 8. 组装成 `hdc-0.12.img`
-9. 按需把新镜像同步到仓库的 `images/`
+9. 按需把新的启动镜像和压缩后的系统镜像同步到仓库的 `images/`
 10. 启动 QEMU，抓取 VGA 文本，并自动向 guest 发送按键完成验证
 
 这条链路当前只实现“最小可运行系统”，不尝试复刻一个完整的历史 Linux 0.12 发行版。
@@ -340,7 +341,7 @@ python3 rebuild/driver.py run
 - `scripts/`
   不同宿主机的入口脚本
 - `images/`
-  提交到仓库中的自编译运行镜像快照
+  提交到仓库中的自编译运行镜像快照，其中系统镜像以压缩形式保存
 - `rebuild/driver.py`
   源码构建、运行和验证入口
 - `rebuild/container/build_images.sh`
@@ -363,8 +364,8 @@ python3 rebuild/driver.py run
 ## 运行说明
 
 - 启动镜像本身不足 1.44MB，驱动会在启动前补齐成标准软盘镜像
-- `scripts/run.*` 默认直接使用仓库里的 `images/`
-- `scripts/run-window.*` 默认直接使用仓库里的 `images/`，并弹出可见的 QEMU 窗口
+- `scripts/run.*` 默认直接使用仓库里的 `images/` 快照，并在 `out/repo-images/` 里自动解包系统镜像
+- `scripts/run-window.*` 默认直接使用仓库里的 `images/` 快照，并在 `out/repo-images/` 里自动解包系统镜像后弹出可见的 QEMU 窗口
 - `scripts/build-and-run.*` 会重编源码并刷新 `images/`
 - `scripts/build-and-run-window.*` 会重编源码、刷新 `images/`，然后弹出可见的 QEMU 窗口
 - QEMU 始终以 `-snapshot` 启动，所以重复运行不会改写 `rebuild/out/images/hdc-0.12.img`

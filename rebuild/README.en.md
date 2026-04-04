@@ -9,7 +9,7 @@
 - build `rebuild/out/images/bootimage-0.12-hd`
 - build `rebuild/out/images/hdc-0.12.img`
 - use `driver.py` to orchestrate Docker and QEMU for build, boot, and verification
-- sync built images into the repo-level `images/` directory when requested
+- sync the built boot image and compressed hard disk snapshot into the repo-level `images/` directory when requested
 
 ## Main Contents
 
@@ -41,4 +41,4 @@ python3 rebuild/driver.py run-repo-images-window
 
 - this directory owns source build and image assembly
 - runtime output under `rebuild/out/` is generated content
-- repo-managed image snapshots live in the top-level `images/` directory
+- repo-managed image snapshots live in the top-level `images/` directory, with the hard disk stored in compressed form

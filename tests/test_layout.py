@@ -19,7 +19,7 @@ class LayoutTest(unittest.TestCase):
             ROOT / ".github" / "workflows" / "ci.yml",
             ROOT / "images",
             ROOT / "images" / "bootimage-0.12-hd",
-            ROOT / "images" / "hdc-0.12.img",
+            ROOT / "images" / "hdc-0.12.img.xz",
             ROOT / "rebuild" / "README.md",
             ROOT / "rebuild" / "Dockerfile",
             ROOT / "rebuild" / "driver.py",

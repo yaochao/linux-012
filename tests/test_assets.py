@@ -18,7 +18,7 @@ class AssetTest(unittest.TestCase):
     def test_repo_runtime_images_exist_and_are_non_empty(self) -> None:
         assets = [
             ROOT / "images" / "bootimage-0.12-hd",
-            ROOT / "images" / "hdc-0.12.img",
+            ROOT / "images" / "hdc-0.12.img.xz",
         ]
 
         for asset in assets:

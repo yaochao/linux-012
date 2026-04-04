@@ -9,9 +9,9 @@
 - `bootstrap-host.*`
   检查 Python、QEMU、Docker 等宿主依赖
 - `run.*`
-  直接使用仓库镜像启动
+  直接使用仓库镜像快照启动，并自动解包系统镜像
 - `run-window.*`
-  直接使用仓库镜像并弹出可见 QEMU 窗口
+  直接使用仓库镜像快照、自动解包系统镜像，并弹出可见 QEMU 窗口
 - `build-and-run.*`
   先编译再启动
 - `build-and-run-window.*`

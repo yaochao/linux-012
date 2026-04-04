@@ -1,7 +1,16 @@
 import pathlib
+import tempfile
 import unittest
 
-from rebuild.driver import BuildPaths, docker_build_command, docker_run_command, parse_args, verify_environment
+from rebuild.driver import (
+    BuildPaths,
+    docker_build_command,
+    docker_run_command,
+    ensure_repo_runtime_images,
+    parse_args,
+    sync_repo_images,
+    verify_environment,
+)
 
 
 class RebuildDriverTest(unittest.TestCase):
@@ -14,7 +23,8 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertEqual(root / "rebuild" / "out" / "images" / "hdc-0.12.img", paths.hard_disk_image)
         self.assertEqual(root / "images", paths.repo_images_dir)
         self.assertEqual(root / "images" / "bootimage-0.12-hd", paths.repo_boot_image)
-        self.assertEqual(root / "images" / "hdc-0.12.img", paths.repo_hard_disk_image)
+        self.assertEqual(root / "images" / "hdc-0.12.img.xz", paths.repo_hard_disk_image_archive)
+        self.assertEqual(root / "out" / "repo-images" / "hdc-0.12.img", paths.repo_runtime_hard_disk_image)
 
     def test_docker_run_command_uses_linux_amd64_and_privileged_mode(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
@@ -67,7 +77,44 @@ class RebuildDriverTest(unittest.TestCase):
         env = verify_environment(paths, source="repo")
 
         self.assertEqual(str(paths.repo_boot_image), env["LINUX012_BOOT_SOURCE_IMAGE"])
-        self.assertEqual(str(paths.repo_hard_disk_image), env["LINUX012_HARD_DISK_IMAGE"])
+        self.assertEqual(str(paths.repo_runtime_hard_disk_image), env["LINUX012_HARD_DISK_IMAGE"])
+
+    def test_sync_repo_images_compresses_repo_hard_disk_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            paths = BuildPaths.from_root(root)
+            paths.images_dir.mkdir(parents=True)
+            paths.repo_images_dir.mkdir(parents=True)
+            paths.boot_image.write_bytes(b"boot")
+            paths.hard_disk_image.write_bytes(b"disk" * 4096)
+
+            status = sync_repo_images(paths)
+
+            self.assertEqual(0, status)
+            self.assertEqual(b"boot", paths.repo_boot_image.read_bytes())
+            self.assertTrue(paths.repo_hard_disk_image_archive.exists())
+            self.assertGreater(paths.repo_hard_disk_image_archive.stat().st_size, 0)
+            self.assertFalse((paths.repo_images_dir / "hdc-0.12.img").exists())
+
+    def test_ensure_repo_runtime_images_extracts_repo_disk_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            paths = BuildPaths.from_root(root)
+            paths.repo_images_dir.mkdir(parents=True)
+            paths.repo_boot_image.write_bytes(b"boot")
+            paths.repo_runtime_hard_disk_image.parent.mkdir(parents=True)
+            paths.repo_runtime_hard_disk_image.write_bytes(b"stale")
+            paths.repo_runtime_hard_disk_image.unlink()
+            paths.boot_image.parent.mkdir(parents=True, exist_ok=True)
+            paths.hard_disk_image.parent.mkdir(parents=True, exist_ok=True)
+            paths.boot_image.write_bytes(b"boot")
+            paths.hard_disk_image.write_bytes(b"disk" * 4096)
+            self.assertEqual(0, sync_repo_images(paths))
+
+            status = ensure_repo_runtime_images(paths)
+
+            self.assertEqual(0, status)
+            self.assertEqual(b"disk" * 4096, paths.repo_runtime_hard_disk_image.read_bytes())
 
     def test_build_script_references_source_tarball_userland_and_manifest(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]

@@ -7,7 +7,7 @@ This repository does one specific thing: on a modern host, it builds the two run
 The repository no longer stores third-party runtime images. The repository now includes self-built runtime image snapshots under version control:
 
 - `images/bootimage-0.12-hd`
-- `images/hdc-0.12.img`
+- `images/hdc-0.12.img.xz`
 
 The same source-build workflow also produces local working images:
 
@@ -23,7 +23,7 @@ The build and runtime flow is:
 - compile the kernel boot image
 - compile the repo-owned minimal userland programs `/bin/sh` and `/bin/ls`
 - build a Minix v1 root filesystem from repo manifests
-- generate the repo-bundled images `images/bootimage-0.12-hd` and `images/hdc-0.12.img`
+- generate the repo-bundled images `images/bootimage-0.12-hd` and `images/hdc-0.12.img.xz`
 - boot QEMU
 - reach `[/usr/root]#`
 - run `ls`
@@ -113,7 +113,7 @@ Windows CMD:
 scripts\run.cmd
 ```
 
-This entrypoint uses the committed images in `images/` directly and does not rebuild first. On macOS / Ubuntu it keeps the current terminal-based interactive flow; on Windows it already uses a visible GUI window.
+This entrypoint uses the committed snapshots in `images/` directly and does not rebuild first. The hard disk image is automatically unpacked to `out/repo-images/hdc-0.12.img` before launch. On macOS / Ubuntu it keeps the current terminal-based interactive flow; on Windows it already uses a visible GUI window.
 
 ### 4. Open A Visible QEMU Window And Interact Manually
 
@@ -161,7 +161,7 @@ Windows CMD:
 scripts\build-and-run.cmd
 ```
 
-This entrypoint forces a rebuild, syncs the new images into `images/`, and then starts QEMU.
+This entrypoint forces a rebuild, syncs the new images into `images/`, stores the hard disk image as the compressed snapshot `images/hdc-0.12.img.xz`, and then starts QEMU.
 
 If you want the flow to start from compilation and still end in a visible interactive QEMU window, run:
 
@@ -299,7 +299,8 @@ Important generated artifacts:
 - `rebuild/out/images/bootimage-0.12-hd`
 - `rebuild/out/images/hdc-0.12.img`
 - `images/bootimage-0.12-hd`
-- `images/hdc-0.12.img`
+- `images/hdc-0.12.img.xz`
+- `out/repo-images/hdc-0.12.img`
 - `out/verify/screen.txt`
 - `out/verify-userland/screen.txt`
 - `out/run/boot.img`
@@ -316,7 +317,7 @@ The `rebuild/` directory owns the full source-to-image pipeline:
 6. create directories, device nodes, and boot files from `rebuild/rootfs/manifest/`
 7. build a Minix v1 root filesystem that Linux 0.12 can mount
 8. assemble `hdc-0.12.img`
-9. sync new images into the repo-managed `images/` directory when requested
+9. sync the new boot image and compressed hard disk snapshot into the repo-managed `images/` directory when requested
 10. boot QEMU, scrape VGA text, and inject keys to complete verification
 
 This pipeline intentionally builds only the smallest system required by the repo. It does not try to recreate a full historical Linux 0.12 distribution.
@@ -340,7 +341,7 @@ The current standalone userland binaries are:
 - `scripts/`
   host-specific entry scripts
 - `images/`
-  committed snapshots of the self-built runtime images
+  committed snapshots of the self-built runtime images, with the hard disk stored in compressed form
 - `rebuild/driver.py`
   source build, runtime, and verification entrypoint
 - `rebuild/container/build_images.sh`
@@ -363,8 +364,8 @@ The current standalone userland binaries are:
 ## Runtime Notes
 
 - The boot image is shorter than 1.44MB, so the driver pads it into a full floppy image before launch
-- `scripts/run.*` uses the committed images in `images/` by default
-- `scripts/run-window.*` uses the committed images in `images/` and opens a visible QEMU window
+- `scripts/run.*` uses the committed snapshots in `images/` by default and unpacks the hard disk image into `out/repo-images/`
+- `scripts/run-window.*` uses the committed snapshots in `images/`, unpacks the hard disk image into `out/repo-images/`, and opens a visible QEMU window
 - `scripts/build-and-run.*` rebuilds from source and refreshes `images/`
 - `scripts/build-and-run-window.*` rebuilds from source, refreshes `images/`, and opens a visible QEMU window
 - QEMU always starts with `-snapshot`, so repeated runs do not mutate `rebuild/out/images/hdc-0.12.img`

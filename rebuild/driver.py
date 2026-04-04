@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import lzma
 import os
 import shutil
 import subprocess
@@ -24,7 +25,9 @@ class BuildPaths:
     boot_image: Path
     hard_disk_image: Path
     repo_boot_image: Path
-    repo_hard_disk_image: Path
+    repo_hard_disk_image_archive: Path
+    repo_runtime_dir: Path
+    repo_runtime_hard_disk_image: Path
 
     @classmethod
     def from_root(cls, root: Path) -> "BuildPaths":
@@ -32,6 +35,7 @@ class BuildPaths:
         out_dir = rebuild_dir / "out"
         images_dir = out_dir / "images"
         repo_images_dir = root / "images"
+        repo_runtime_dir = root / "out" / "repo-images"
         return cls(
             root=root,
             repo_images_dir=repo_images_dir,
@@ -43,7 +47,9 @@ class BuildPaths:
             boot_image=images_dir / "bootimage-0.12-hd",
             hard_disk_image=images_dir / "hdc-0.12.img",
             repo_boot_image=repo_images_dir / "bootimage-0.12-hd",
-            repo_hard_disk_image=repo_images_dir / "hdc-0.12.img",
+            repo_hard_disk_image_archive=repo_images_dir / "hdc-0.12.img.xz",
+            repo_runtime_dir=repo_runtime_dir,
+            repo_runtime_hard_disk_image=repo_runtime_dir / "hdc-0.12.img",
         )
 
 
@@ -91,7 +97,7 @@ def verify_environment(paths: BuildPaths, source: str = "rebuild") -> dict[str, 
         return env
     if source == "repo":
         env["LINUX012_BOOT_SOURCE_IMAGE"] = str(paths.repo_boot_image)
-        env["LINUX012_HARD_DISK_IMAGE"] = str(paths.repo_hard_disk_image)
+        env["LINUX012_HARD_DISK_IMAGE"] = str(paths.repo_runtime_hard_disk_image)
         return env
     raise ValueError(f"Unsupported runtime image source: {source}")
 
@@ -153,7 +159,7 @@ def ensure_rebuilt_images(paths: BuildPaths) -> int:
 
 
 def require_repo_images(paths: BuildPaths) -> bool:
-    required = [paths.repo_boot_image, paths.repo_hard_disk_image]
+    required = [paths.repo_boot_image, paths.repo_hard_disk_image_archive]
     missing = [path for path in required if not path.exists() or path.stat().st_size == 0]
     if not missing:
         return True
@@ -164,12 +170,44 @@ def require_repo_images(paths: BuildPaths) -> bool:
     return False
 
 
+def compress_image_snapshot(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f"{target.name}.tmp")
+    with source.open("rb") as source_handle, lzma.open(temporary, "wb", preset=9 | lzma.PRESET_EXTREME) as target_handle:
+        shutil.copyfileobj(source_handle, target_handle)
+    temporary.replace(target)
+
+
+def extract_image_snapshot(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f"{target.name}.tmp")
+    with lzma.open(source, "rb") as source_handle, temporary.open("wb") as target_handle:
+        shutil.copyfileobj(source_handle, target_handle)
+    temporary.replace(target)
+    os.utime(target, ns=(source.stat().st_mtime_ns, source.stat().st_mtime_ns))
+
+
 def sync_repo_images(paths: BuildPaths) -> int:
     if not require_rebuilt_images(paths):
         return 1
     paths.repo_images_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(paths.boot_image, paths.repo_boot_image)
-    shutil.copy2(paths.hard_disk_image, paths.repo_hard_disk_image)
+    compress_image_snapshot(paths.hard_disk_image, paths.repo_hard_disk_image_archive)
+    legacy_image = paths.repo_images_dir / "hdc-0.12.img"
+    if legacy_image.exists():
+        legacy_image.unlink()
+    return 0
+
+
+def ensure_repo_runtime_images(paths: BuildPaths) -> int:
+    if not require_repo_images(paths):
+        return 1
+    archive = paths.repo_hard_disk_image_archive
+    runtime_image = paths.repo_runtime_hard_disk_image
+    if runtime_image.exists() and runtime_image.stat().st_size > 0:
+        if runtime_image.stat().st_mtime_ns >= archive.stat().st_mtime_ns:
+            return 0
+    extract_image_snapshot(archive, runtime_image)
     return 0
 
 
@@ -194,7 +232,7 @@ def run_runtime(paths: BuildPaths, mode: str) -> int:
 
 
 def run_repo_runtime(paths: BuildPaths, mode: str = "run") -> int:
-    if not require_repo_images(paths):
+    if ensure_repo_runtime_images(paths) != 0:
         return 1
     return run_command(
         [sys.executable, str(paths.root / "tools" / "qemu_driver.py"), mode],

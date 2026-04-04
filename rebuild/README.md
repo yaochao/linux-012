@@ -9,7 +9,7 @@
 - 构建 `rebuild/out/images/bootimage-0.12-hd`
 - 构建 `rebuild/out/images/hdc-0.12.img`
 - 通过 `driver.py` 调用 Docker 和 QEMU 完成构建、启动与验证
-- 在需要时把构建出来的镜像同步到仓库根目录的 `images/`
+- 在需要时把构建出来的启动镜像和压缩后的系统镜像同步到仓库根目录的 `images/`
 
 ## 主要内容
 
@@ -41,4 +41,4 @@ python3 rebuild/driver.py run-repo-images-window
 
 - 这里只管理源码构建和镜像装配流程
 - 运行时输出在 `rebuild/out/`，属于生成产物
-- 受版本控制的镜像快照在仓库根目录 `images/`
+- 受版本控制的镜像快照在仓库根目录 `images/`，其中系统镜像以压缩形式保存

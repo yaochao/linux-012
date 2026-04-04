@@ -9,9 +9,9 @@ This directory stores host-facing one-command entry scripts. Each platform has i
 - `bootstrap-host.*`
   check host dependencies such as Python, QEMU, and Docker
 - `run.*`
-  boot directly from the repo-managed images
+  boot directly from the repo-managed snapshots and unpack the hard disk image automatically
 - `run-window.*`
-  boot directly from the repo-managed images and open a visible QEMU window
+  boot directly from the repo-managed snapshots, unpack the hard disk image automatically, and open a visible QEMU window
 - `build-and-run.*`
   rebuild first, then boot
 - `build-and-run-window.*`
