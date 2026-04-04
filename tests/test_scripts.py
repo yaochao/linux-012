@@ -36,6 +36,9 @@ class ScriptTest(unittest.TestCase):
 
         self.assertEqual(0, result.returncode)
         self.assertIn("qemu-system-i386", result.stdout)
+        self.assertIn("bootimage-0.12-hd", result.stdout)
+        self.assertIn("hdc-0.12.img", result.stdout)
+        self.assertIn("-snapshot", result.stdout)
 
 
 if __name__ == "__main__":
