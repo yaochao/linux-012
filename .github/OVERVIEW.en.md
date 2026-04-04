@@ -1,6 +1,6 @@
 # `.github/`
 
-[中文 README](./README.md)
+[中文说明](./OVERVIEW.md)
 
 This directory stores GitHub-specific configuration. It currently contains both continuous integration and release-asset workflow definitions.
 

@@ -11,8 +11,8 @@ class LayoutTest(unittest.TestCase):
         expected = [
             ROOT / "README.md",
             ROOT / ".github",
-            ROOT / ".github" / "README.md",
-            ROOT / ".github" / "README.en.md",
+            ROOT / ".github" / "OVERVIEW.md",
+            ROOT / ".github" / "OVERVIEW.en.md",
             ROOT / ".github" / "workflows",
             ROOT / ".github" / "workflows" / "README.md",
             ROOT / ".github" / "workflows" / "README.en.md",
@@ -69,6 +69,8 @@ class LayoutTest(unittest.TestCase):
 
         missing = [str(path.relative_to(ROOT)) for path in expected if not path.exists()]
         self.assertEqual([], missing)
+        self.assertFalse((ROOT / ".github" / "README.md").exists())
+        self.assertFalse((ROOT / ".github" / "README.en.md").exists())
 
     def test_tracked_directories_have_bilingual_readmes(self) -> None:
         tracked = subprocess.run(
@@ -86,7 +88,11 @@ class LayoutTest(unittest.TestCase):
 
         missing: list[str] = []
         for directory in directories:
-            for name in ("README.md", "README.en.md"):
+            if directory == ROOT / ".github":
+                names = ("OVERVIEW.md", "OVERVIEW.en.md")
+            else:
+                names = ("README.md", "README.en.md")
+            for name in names:
                 path = directory / name
                 if not path.exists():
                     missing.append(str(path.relative_to(ROOT)))
