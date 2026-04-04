@@ -1,22 +1,24 @@
 # Linux 0.12 On QEMU
 
-This repository boots Linux 0.12 under `qemu-system-i386` and keeps all project artifacts inside the repo. The runtime is organized around one Python driver with thin host-specific wrappers for:
+[English Version](./README.en.md)
+
+这个仓库把 Linux 0.12 跑在 `qemu-system-i386` 上，并且把项目运行所需的文件都放在仓库内部。整个运行时围绕一个 Python 驱动组织，同时提供不同宿主机的薄包装脚本，当前支持：
 
 - macOS arm64
 - Ubuntu 22.04
 - Windows 10
 
-The working boot path is:
+当前仓库采用的启动路径是：
 
-- one historical Linux 0.12 boot floppy image
-- one Linux 0.12 hard disk image mounted as `hda`
-- one runtime step that pads the short boot image into a standard 1.44MB floppy before each launch
+- 一张历史 Linux 0.12 启动软盘镜像
+- 一张作为 `hda` 挂载的 Linux 0.12 硬盘镜像
+- 每次启动前把较短的 boot image 补齐成标准 1.44MB 软盘镜像
 
-On Unix-like hosts, `./scripts/run.sh` lands at the Linux shell prompt `[/]#` inside a terminal curses UI.
-On Windows 10, `scripts\run.cmd` or `.\scripts\run.ps1` opens the default QEMU window and drives the same boot flow.
-The verification entrypoints boot the same VM, run `ls`, and exit non-zero if verification fails.
+在 macOS 和 Ubuntu 22.04 上，`./scripts/run.sh` 会以终端 curses 界面启动，并最终进入 Linux 0.12 的 `[/]#` 提示符。
+在 Windows 10 上，`scripts\run.cmd` 或 `.\scripts\run.ps1` 会打开默认的 QEMU 图形窗口，并驱动相同的启动流程。
+自动验证入口会启动同一台虚拟机，执行 `ls`，如果验证失败则返回非零退出码。
 
-## Host Requirements
+## 宿主机要求
 
 ### macOS arm64
 
@@ -33,11 +35,11 @@ sudo apt install -y python3 qemu-system-x86
 
 ### Windows 10
 
-- Install Python 3.
-- Install QEMU for Windows.
-- Ensure `qemu-system-i386.exe` is on `PATH`, or set `LINUX012_QEMU_BIN` to the full path of the QEMU binary.
+- 安装 Python 3。
+- 安装 Windows 版 QEMU。
+- 确保 `qemu-system-i386.exe` 在 `PATH` 中，或者把 `LINUX012_QEMU_BIN` 设置为 QEMU 可执行文件的完整路径。
 
-Confirm the host dependency with the wrapper that matches the host:
+安装完成后，用对应平台的入口检查宿主机依赖：
 
 ```sh
 ./scripts/bootstrap-host.sh
@@ -51,17 +53,17 @@ Confirm the host dependency with the wrapper that matches the host:
 scripts\bootstrap-host.cmd
 ```
 
-## Commands
+## 使用方式
 
-### macOS and Ubuntu 22.04
+### macOS 和 Ubuntu 22.04
 
-Interactive boot:
+交互启动：
 
 ```sh
 ./scripts/run.sh
 ```
 
-Automated verification:
+自动验证：
 
 ```sh
 ./scripts/verify.sh
@@ -69,60 +71,60 @@ Automated verification:
 
 ### Windows 10 PowerShell
 
-Interactive boot:
+交互启动：
 
 ```powershell
 .\scripts\run.ps1
 ```
 
-Automated verification:
+自动验证：
 
 ```powershell
 .\scripts\verify.ps1
 ```
 
-### Windows 10 Command Prompt
+### Windows 10 命令提示符
 
-Interactive boot:
+交互启动：
 
 ```bat
 scripts\run.cmd
 ```
 
-Automated verification:
+自动验证：
 
 ```bat
 scripts\verify.cmd
 ```
 
-The verification command stores the latest artifacts under `out/verify/`, including:
+验证命令会把最新运行结果保存在 `out/verify/`，包括：
 
-- `screen.txt`: the final decoded VGA text screen
-- `m.log`: monitor traffic
-- `q.log`: QEMU output
+- `screen.txt`：最终解码后的 VGA 文本屏幕
+- `m.log`：QEMU monitor 交互日志
+- `q.log`：QEMU 标准输出和错误输出
 
-The interactive launcher uses `out/run/` for the same kind of runtime artifacts.
+交互启动时对应的运行产物会保存在 `out/run/`。
 
-## Repo Layout
+## 仓库结构
 
-- `scripts/bootstrap-host.sh`, `scripts/run.sh`, `scripts/verify.sh`: Unix wrappers for macOS and Ubuntu 22.04
-- `scripts/bootstrap-host.ps1`, `scripts/run.ps1`, `scripts/verify.ps1`: PowerShell wrappers for Windows 10
-- `scripts/bootstrap-host.cmd`, `scripts/run.cmd`, `scripts/verify.cmd`: Command Prompt wrappers that delegate to PowerShell
-- `tools/qemu_driver.py`: runtime asset preparation, QEMU discovery, QEMU launch, VGA scraping, and key injection
-- `vendor/src/linux-0.12.tar.gz`: Linux 0.12 source archive
-- `vendor/images/bootimage-0.12-hd`: historical Linux 0.12 boot image for hard-disk-root boot
-- `vendor/images/hdc-0.12.img`: Linux 0.12 hard disk image used as `hda`
+- `scripts/bootstrap-host.sh`、`scripts/run.sh`、`scripts/verify.sh`：macOS 和 Ubuntu 22.04 的 Unix 包装脚本
+- `scripts/bootstrap-host.ps1`、`scripts/run.ps1`、`scripts/verify.ps1`：Windows 10 的 PowerShell 包装脚本
+- `scripts/bootstrap-host.cmd`、`scripts/run.cmd`、`scripts/verify.cmd`：Windows 10 命令提示符入口，内部转调 PowerShell
+- `tools/qemu_driver.py`：负责准备运行时镜像、发现 QEMU、启动 QEMU、抓取 VGA 文本和注入按键
+- `vendor/src/linux-0.12.tar.gz`：Linux 0.12 源码归档
+- `vendor/images/bootimage-0.12-hd`：用于硬盘根文件系统启动的历史 Linux 0.12 boot image
+- `vendor/images/hdc-0.12.img`：以 `hda` 挂载的 Linux 0.12 硬盘镜像
 
-## Notes
+## 说明
 
-- The bundled boot image is shorter than 1.44MB. The driver pads it to a full floppy image in `out/run/boot.img` or `out/verify/boot.img` before launch.
-- QEMU is started with `-snapshot`, so repeated runs do not mutate the vendored hard disk image.
-- macOS and Ubuntu 22.04 use a local Unix socket for the QEMU monitor and `-display curses` for interactive sessions.
-- Windows 10 uses a localhost TCP monitor endpoint because the Windows build does not offer Unix domain sockets. Interactive sessions rely on QEMU's default visible display.
-- The guest prints `/root: ENOENT` before the shell prompt. This is expected for the bundled image and does not prevent the shell from working.
+- 仓库内的 boot image 本身不足 1.44MB。驱动会在启动前把它补齐到 `out/run/boot.img` 或 `out/verify/boot.img`。
+- QEMU 总是以 `-snapshot` 方式启动，因此重复运行不会改写仓库内置的硬盘镜像。
+- macOS 和 Ubuntu 22.04 在交互模式下使用本地 Unix socket 作为 QEMU monitor，并启用 `-display curses`。
+- Windows 10 由于没有 Unix domain socket，改用本机 `localhost` TCP monitor；交互模式使用 QEMU 默认可见窗口。
+- 这个 Linux 0.12 镜像在进入 shell 前会打印 `/root: ENOENT`。这是镜像本身的已知现象，不影响进入命令行。
 
-## Asset Provenance
+## 资源来源
 
-- `vendor/src/linux-0.12.tar.gz` comes from the kernel.org historic archive.
-- `vendor/images/bootimage-0.12-hd` comes from the OldLinux `linux-0.12-080324.zip` package.
-- `vendor/images/hdc-0.12.img` comes from the `chenzhengchen200821109/linux-0.12` repository, which packages a Linux 0.12 hard disk image for QEMU.
+- `vendor/src/linux-0.12.tar.gz` 来自 kernel.org 的历史归档。
+- `vendor/images/bootimage-0.12-hd` 来自 OldLinux 的 `linux-0.12-080324.zip`。
+- `vendor/images/hdc-0.12.img` 来自 `chenzhengchen200821109/linux-0.12` 仓库中提供的 Linux 0.12 QEMU 硬盘镜像。
