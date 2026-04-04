@@ -3,6 +3,8 @@ import subprocess
 import sys
 import unittest
 
+from tools.qemu_driver import resolve_host_platform
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -19,7 +21,7 @@ class ScriptTest(unittest.TestCase):
         )
 
         self.assertNotEqual(0, result.returncode)
-        self.assertIn("brew install qemu", result.stderr)
+        self.assertIn(resolve_host_platform().install_hint, result.stderr)
 
     def test_verify_script_calls_python_driver(self) -> None:
         text = (ROOT / "scripts" / "verify.sh").read_text()
