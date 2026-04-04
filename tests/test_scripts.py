@@ -23,13 +23,13 @@ class ScriptTest(unittest.TestCase):
 
     def test_verify_script_calls_python_driver(self) -> None:
         text = (ROOT / "scripts" / "verify.sh").read_text()
-        self.assertIn("tools/qemu_driver.py", text)
+        self.assertIn("rebuild/driver.py", text)
         self.assertIn("verify", text)
 
     def test_windows_verify_powershell_script_calls_python_driver(self) -> None:
         text = (ROOT / "scripts" / "verify.ps1").read_text()
 
-        self.assertIn("tools/qemu_driver.py", text)
+        self.assertIn("rebuild/driver.py", text)
         self.assertIn("verify", text)
 
     def test_windows_run_batch_script_delegates_to_powershell(self) -> None:

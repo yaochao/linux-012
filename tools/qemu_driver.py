@@ -76,11 +76,11 @@ class DriverPaths:
             platform=host,
             boot_source_image=resolve_runtime_image(
                 "LINUX012_BOOT_SOURCE_IMAGE",
-                root / "vendor" / "images" / "bootimage-0.12-hd",
+                root / "rebuild" / "out" / "images" / "bootimage-0.12-hd",
             ),
             hard_disk_image=resolve_runtime_image(
                 "LINUX012_HARD_DISK_IMAGE",
-                root / "vendor" / "images" / "hdc-0.12.img",
+                root / "rebuild" / "out" / "images" / "hdc-0.12.img",
             ),
             out_dir=out_dir,
             boot_floppy_image=out_dir / "boot.img",
@@ -362,6 +362,14 @@ def prepare_output_dir(paths: DriverPaths) -> None:
 
 
 def prepare_runtime_assets(paths: DriverPaths) -> None:
+    missing = [path for path in (paths.boot_source_image, paths.hard_disk_image) if not path.exists()]
+    if missing:
+        missing_text = "\n".join(f"  {path}" for path in missing)
+        raise FileNotFoundError(
+            "Missing source-built runtime images:\n"
+            f"{missing_text}\n"
+            "Run `python3 rebuild/driver.py build` first."
+        )
     prepare_output_dir(paths)
     ensure_boot_floppy_image(source_image=paths.boot_source_image, target_image=paths.boot_floppy_image)
 

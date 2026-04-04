@@ -76,12 +76,12 @@ class QemuDriverTest(unittest.TestCase):
         self.assertIn("-display", command)
         self.assertIn("none", command)
 
-    def test_driver_paths_use_runtime_boot_image_and_short_monitor_names(self) -> None:
+    def test_driver_paths_use_rebuild_outputs_by_default(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
         paths = DriverPaths.from_root(root, platform=resolve_host_platform("darwin"))
 
-        self.assertEqual(root / "vendor" / "images" / "bootimage-0.12-hd", paths.boot_source_image)
-        self.assertEqual(root / "vendor" / "images" / "hdc-0.12.img", paths.hard_disk_image)
+        self.assertEqual(root / "rebuild" / "out" / "images" / "bootimage-0.12-hd", paths.boot_source_image)
+        self.assertEqual(root / "rebuild" / "out" / "images" / "hdc-0.12.img", paths.hard_disk_image)
         self.assertEqual(root / "out" / "verify" / "boot.img", paths.boot_floppy_image)
         self.assertEqual(root / "out" / "verify" / "m.sock", paths.monitor_socket)
 

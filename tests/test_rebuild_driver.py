@@ -1,7 +1,7 @@
 import pathlib
 import unittest
 
-from rebuild.driver import BuildPaths, docker_build_command, docker_run_command
+from rebuild.driver import BuildPaths, docker_build_command, docker_run_command, parse_args, verify_environment
 
 
 class RebuildDriverTest(unittest.TestCase):
@@ -34,6 +34,19 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertIn(str(paths.rebuild_dir / "Dockerfile"), command)
         self.assertEqual(str(root), command[-1])
 
+    def test_parse_args_supports_bootstrap_build_run_verify(self) -> None:
+        for command in ("bootstrap-host", "build", "run", "verify"):
+            self.assertEqual(command, parse_args([command]).command)
+
+    def test_verify_environment_points_runtime_at_rebuild_outputs(self) -> None:
+        root = pathlib.Path("/tmp/linux-012")
+        paths = BuildPaths.from_root(root)
+
+        env = verify_environment(paths)
+
+        self.assertEqual(str(paths.boot_image), env["LINUX012_BOOT_SOURCE_IMAGE"])
+        self.assertEqual(str(paths.hard_disk_image), env["LINUX012_HARD_DISK_IMAGE"])
+
     def test_build_script_references_source_tarball_and_patch_directory(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]
         text = (root / "rebuild" / "container" / "build_images.sh").read_text()
@@ -50,14 +63,6 @@ class RebuildDriverTest(unittest.TestCase):
         text = (root / "rebuild" / "container" / "build_images.sh").read_text()
 
         self.assertIn("mkfs.minix -1 -n14", text)
-
-    def test_capture_script_uses_guestfish_for_minix_export(self) -> None:
-        root = pathlib.Path(__file__).resolve().parents[1]
-        text = (root / "rebuild" / "container" / "capture_rootfs.sh").read_text()
-
-        self.assertIn("guestfish", text)
-        self.assertIn("tar-out", text)
-        self.assertNotIn("mount -t minix", text)
 
     def test_dockerfile_installs_libguestfs_tools(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]

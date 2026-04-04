@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -83,21 +82,18 @@ def verify_environment(paths: BuildPaths) -> dict[str, str]:
     return env
 
 
-def promotion_pairs(paths: BuildPaths) -> list[tuple[Path, Path]]:
-    return [
-        (paths.boot_image, paths.root / "vendor" / "images" / "bootimage-0.12-hd"),
-        (paths.hard_disk_image, paths.root / "vendor" / "images" / "hdc-0.12.img"),
-    ]
-
-
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["capture-rootfs", "build", "verify", "promote"])
+    parser.add_argument("command", choices=["bootstrap-host", "build", "run", "verify"])
     return parser.parse_args(argv)
 
 
 def run_command(command: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> int:
-    return subprocess.run(command, cwd=cwd, env=env, check=False).returncode
+    try:
+        return subprocess.run(command, cwd=cwd, env=env, check=False).returncode
+    except FileNotFoundError as exc:
+        print(f"Missing host dependency: {exc.filename}", file=sys.stderr)
+        return 1
 
 
 def run_container_script(paths: BuildPaths, script: str) -> int:
@@ -119,46 +115,46 @@ def require_rebuilt_images(paths: BuildPaths) -> bool:
     return False
 
 
-def run_capture_rootfs(paths: BuildPaths) -> int:
-    return run_container_script(paths, script="rebuild/container/capture_rootfs.sh")
-
-
 def run_build(paths: BuildPaths) -> int:
     return run_container_script(paths, script="rebuild/container/build_images.sh")
 
 
-def run_verify(paths: BuildPaths) -> int:
-    if not require_rebuilt_images(paths):
+def ensure_rebuilt_images(paths: BuildPaths) -> int:
+    if require_rebuilt_images(paths):
+        return 0
+    return run_build(paths)
+
+
+def run_bootstrap_host(paths: BuildPaths) -> int:
+    qemu_status = run_command(
+        [sys.executable, str(paths.root / "tools" / "qemu_driver.py"), "bootstrap-host"],
+        cwd=paths.root,
+    )
+    if qemu_status != 0:
+        return qemu_status
+    return run_command(["docker", "--version"], cwd=paths.root)
+
+
+def run_runtime(paths: BuildPaths, mode: str) -> int:
+    if ensure_rebuilt_images(paths) != 0:
         return 1
     return run_command(
-        [sys.executable, str(paths.root / "tools" / "qemu_driver.py"), "verify"],
+        [sys.executable, str(paths.root / "tools" / "qemu_driver.py"), mode],
         cwd=paths.root,
         env=verify_environment(paths),
-    )
-
-
-def run_promote(paths: BuildPaths) -> int:
-    if run_verify(paths) != 0:
-        return 1
-    for source, target in promotion_pairs(paths):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
-    return run_command(
-        [sys.executable, str(paths.root / "tools" / "qemu_driver.py"), "verify"],
-        cwd=paths.root,
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     paths = BuildPaths.from_root(repo_root())
-    if args.command == "capture-rootfs":
-        return run_capture_rootfs(paths)
+    if args.command == "bootstrap-host":
+        return run_bootstrap_host(paths)
     if args.command == "build":
         return run_build(paths)
-    if args.command == "verify":
-        return run_verify(paths)
-    return run_promote(paths)
+    if args.command == "run":
+        return run_runtime(paths, mode="run")
+    return run_runtime(paths, mode="verify")
 
 
 if __name__ == "__main__":
