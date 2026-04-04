@@ -74,6 +74,20 @@ class QemuDriverTest(unittest.TestCase):
         self.assertEqual(root / "out" / "verify" / "boot.img", paths.boot_floppy_image)
         self.assertEqual(root / "out" / "verify" / "m.sock", paths.monitor_socket)
 
+    def test_driver_paths_use_override_images_from_environment(self) -> None:
+        root = pathlib.Path("/tmp/linux-012")
+        platform = resolve_host_platform("linux")
+        env = {
+            "LINUX012_BOOT_SOURCE_IMAGE": "/tmp/custom/bootimage-0.12-hd",
+            "LINUX012_HARD_DISK_IMAGE": "/tmp/custom/hdc-0.12.img",
+        }
+
+        with patch.dict("os.environ", env, clear=False):
+            paths = DriverPaths.from_root(root, platform=platform)
+
+        self.assertEqual(pathlib.Path(env["LINUX012_BOOT_SOURCE_IMAGE"]), paths.boot_source_image)
+        self.assertEqual(pathlib.Path(env["LINUX012_HARD_DISK_IMAGE"]), paths.hard_disk_image)
+
     def test_driver_paths_use_tcp_monitor_on_windows(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
         paths = DriverPaths.from_root(root, platform=resolve_host_platform("win32"))

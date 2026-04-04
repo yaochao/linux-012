@@ -73,8 +73,14 @@ class DriverPaths:
         return cls(
             root=root,
             platform=host,
-            boot_source_image=root / "vendor" / "images" / "bootimage-0.12-hd",
-            hard_disk_image=root / "vendor" / "images" / "hdc-0.12.img",
+            boot_source_image=resolve_runtime_image(
+                "LINUX012_BOOT_SOURCE_IMAGE",
+                root / "vendor" / "images" / "bootimage-0.12-hd",
+            ),
+            hard_disk_image=resolve_runtime_image(
+                "LINUX012_HARD_DISK_IMAGE",
+                root / "vendor" / "images" / "hdc-0.12.img",
+            ),
             out_dir=out_dir,
             boot_floppy_image=out_dir / "boot.img",
             monitor_address=monitor_address,
@@ -87,6 +93,13 @@ class DriverPaths:
             monitor_log=out_dir / "m.log",
             screen_text=out_dir / "screen.txt",
         )
+
+
+def resolve_runtime_image(env_name: str, default: Path) -> Path:
+    override = os.environ.get(env_name)
+    if not override:
+        return default
+    return Path(override).expanduser()
 
 
 def resolve_host_platform(platform_name: str | None = None) -> HostPlatform:
