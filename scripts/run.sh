@@ -1,4 +1,5 @@
 #!/bin/sh
 set -eu
 
-echo "run placeholder"
+cd "$(dirname "$0")/.."
+exec python3 tools/qemu_driver.py run "$@"

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import argparse
+import shlex
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -88,3 +91,30 @@ def verification_succeeded(final_lines: list[str], baseline_prompt: str) -> bool
     if compact[-1] != baseline_prompt:
         return False
     return any(line and line != f"{baseline_prompt} ls" for line in compact[command_index + 1 : -1])
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mode", choices=["run", "verify"])
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--qemu-bin", default="qemu-system-i386")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+    mode = "interactive" if args.mode == "run" else "verify"
+    paths = DriverPaths.from_root(repo_root())
+    command = build_qemu_command(paths=paths, mode=mode, qemu_bin=args.qemu_bin)
+    if args.dry_run:
+        print(" ".join(shlex.quote(part) for part in command))
+        return 0
+    raise SystemExit(f"{args.mode} mode is not implemented yet")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
