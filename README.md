@@ -264,14 +264,21 @@ python3 rebuild/driver.py build-and-run-repo-images-window
 
 ## 持续集成
 
-仓库现在包含 GitHub Actions 工作流 [ci.yml](/Users/infoxmed-01/ai/workspace/linux-012/.github/workflows/ci.yml)。它会在推送到 `main` 或对 `main` 发起 Pull Request 时，在 `ubuntu-22.04` 上执行：
+仓库现在包含 GitHub Actions 工作流 [ci.yml](/Users/infoxmed-01/ai/workspace/linux-012/.github/workflows/ci.yml)。它会在推送到 `main` 或对 `main` 发起 Pull Request 时执行两类任务：
 
-- `python3 -m unittest discover -s tests -v`
-- `./scripts/bootstrap-host.sh`
-- `python3 rebuild/driver.py build`
-- `./scripts/verify.sh`
+- `ubuntu-22.04` 完整链路：
+  `python3 -m unittest discover -s tests -v`
+  `./scripts/bootstrap-host.sh`
+  `python3 rebuild/driver.py build`
+  `./scripts/verify.sh`
+- `windows-2022` 宿主机 smoke：
+  `py -3 -m unittest discover -s tests -v`
+  `py -3 tools/qemu_driver.py bootstrap-host`
+  基于仓库快照自动解包系统镜像
+  `py -3 tools/qemu_driver.py verify --dry-run`
+  `py -3 tools/qemu_driver.py run-window --dry-run`
 
-失败时会上传 `out/verify` 和 `rebuild/out/logs` 作为排查产物。
+失败时会上传 Ubuntu 的 `out/verify`、`rebuild/out/logs`，以及 Windows 的 `out/repo-images` 作为排查产物。
 
 显式构建镜像：
 

@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  linux-012:
+  linux-012-ubuntu:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
 
@@ -38,7 +38,48 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: linux-012-ci-artifacts
+          name: linux-012-ubuntu-ci-artifacts
           path: |
             out/verify
             rebuild/out/logs
+
+  linux-012-windows-smoke:
+    runs-on: windows-2022
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install QEMU
+        shell: powershell
+        run: choco install qemu --no-progress -y
+
+      - name: Run unit tests
+        shell: powershell
+        run: py -3 -m unittest discover -s tests -v
+
+      - name: Check Windows QEMU host dependency
+        shell: powershell
+        run: py -3 tools/qemu_driver.py bootstrap-host
+
+      - name: Prepare repo runtime image snapshot
+        shell: powershell
+        run: |
+          py -3 -c "from rebuild.driver import BuildPaths, ensure_repo_runtime_images, repo_root; import sys; paths = BuildPaths.from_root(repo_root()); raise SystemExit(ensure_repo_runtime_images(paths))"
+
+      - name: Windows dry-run verification from repo images
+        shell: powershell
+        run: |
+          $env:LINUX012_BOOT_SOURCE_IMAGE = (Join-Path $PWD 'images\bootimage-0.12-hd')
+          $env:LINUX012_HARD_DISK_IMAGE = (Join-Path $PWD 'out\repo-images\hdc-0.12.img')
+          py -3 tools/qemu_driver.py verify --dry-run
+          py -3 tools/qemu_driver.py run-window --dry-run
+
+      - name: Upload Windows smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-012-windows-ci-artifacts
+          path: |
+            out/repo-images
