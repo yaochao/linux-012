@@ -13,7 +13,7 @@ class ScriptTest(unittest.TestCase):
     def test_bootstrap_host_fails_with_clear_message_when_qemu_missing(self) -> None:
         env = {"PATH": ""}
         result = subprocess.run(
-            ["/bin/sh", str(ROOT / "scripts" / "bootstrap-host.sh")],
+            [sys.executable, str(ROOT / "rebuild" / "driver.py"), "bootstrap-host"],
             cwd=ROOT,
             env=env,
             text=True,
