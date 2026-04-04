@@ -18,6 +18,8 @@ class GitHubActionsWorkflowTest(unittest.TestCase):
         self.assertIn("./scripts/bootstrap-host.sh", text)
         self.assertIn("python3 rebuild/driver.py build", text)
         self.assertIn("./scripts/verify.sh", text)
+        self.assertIn("actions/checkout@v5", text)
+        self.assertIn("actions/upload-artifact@v6", text)
 
 
 if __name__ == "__main__":
