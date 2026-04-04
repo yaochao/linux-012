@@ -1,4 +1,5 @@
 import pathlib
+import subprocess
 import unittest
 
 
@@ -52,6 +53,29 @@ class LayoutTest(unittest.TestCase):
         ]
 
         missing = [str(path.relative_to(ROOT)) for path in expected if not path.exists()]
+        self.assertEqual([], missing)
+
+    def test_tracked_directories_have_bilingual_readmes(self) -> None:
+        tracked = subprocess.run(
+            ["git", "ls-tree", "-dr", "--name-only", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout.splitlines()
+        excluded = {
+            "rebuild/out",
+        }
+        directories = [ROOT]
+        directories.extend(ROOT / entry for entry in tracked if entry and entry not in excluded)
+
+        missing: list[str] = []
+        for directory in directories:
+            for name in ("README.md", "README.en.md"):
+                path = directory / name
+                if not path.exists():
+                    missing.append(str(path.relative_to(ROOT)))
+
         self.assertEqual([], missing)
 
 

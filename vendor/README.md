@@ -1,21 +1,16 @@
-# Vendor Assets
+# `vendor/`
 
-`vendor/` now stores third-party source inputs only. Runtime images are built locally and written to `rebuild/out/images/`.
+[English README](./README.en.md)
 
-## Files
+`vendor/` 只保存第三方源码输入，不保存第三方运行时镜像。这个目录目前主要用来存放 Linux 0.12 的上游源码归档，供 `rebuild/` 构建流程使用。
 
-- `src/linux-0.12.tar.gz`
-  - Source: `https://www.kernel.org/pub/linux/kernel/Historic/old-versions/linux-0.12.tar.gz`
+## 主要内容
 
-## Runtime Contract
+- `src/`
+  第三方源码归档所在目录
 
-- `rebuild/driver.py build` generates the runtime images under `rebuild/out/images/`
-- `rebuild/driver.py verify` boots those images in QEMU and runs `ls`
-- `tools/qemu_driver.py` pads the short boot image into `out/run/boot.img` or `out/verify/boot.img` before QEMU starts
-- QEMU always runs with `-snapshot`, so repeated runs do not mutate the generated hard disk image
+## 当前约束
 
-## Provenance Boundary
-
-- Third-party source archive: allowed in `vendor/src/`
-- Third-party runtime images: not stored and not used
-- Runtime images: produced locally from repo-owned source, patches, and manifests
+- 允许第三方源码归档进入 `vendor/src/`
+- 不允许第三方运行时镜像进入仓库
+- 运行镜像必须由本仓库自己的源码、补丁和清单本地生成
