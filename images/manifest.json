@@ -5,8 +5,8 @@
       "size": 196769
     },
     "hdc-0.12.img.xz": {
-      "sha256": "8ac159be9cec2ab3fd1625fc725f0caedfaff47a7b0583229485128d22b6a670",
-      "size": 11692
+      "sha256": "d2c72fd2f4d58d8740e95480e2c4154ea9b61b09de5b23eeab3cf8dbf2ecfceb",
+      "size": 11676
     }
   },
   "download_base_url": "https://github.com/yaochao/linux-012/releases/download/v1.0.0",

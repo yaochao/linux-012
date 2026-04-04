@@ -262,6 +262,17 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertIn('STAGING_DIR="$CONTAINER_WORK_ROOT/rootfs"', text)
         self.assertIn('USERLAND_BUILD="$CONTAINER_WORK_ROOT/userland"', text)
 
+    def test_build_script_normalizes_rootfs_metadata_for_reproducible_images(self) -> None:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "rebuild" / "container" / "build_images.sh").read_text()
+
+        self.assertIn('REFERENCE_TIMESTAMP="$CONTAINER_WORK_ROOT/rootfs.timestamp"', text)
+        self.assertIn('touch -t 199301010000.00 "$REFERENCE_TIMESTAMP"', text)
+        self.assertIn('find "$STAGING_DIR" -exec touch -h -r "$REFERENCE_TIMESTAMP" {} +', text)
+        self.assertIn('tar --sort=name --mtime="1993-01-01 00:00:00Z"', text)
+        self.assertIn('--owner=0 --group=0 --numeric-owner', text)
+        self.assertIn('printf \'\\0\\0\\0\\0\' | dd of="$DISK_IMAGE" bs=1 seek=440 conv=notrunc', text)
+
     def test_dockerfile_installs_multilib_userland_build_dependencies(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]
         text = (root / "rebuild" / "Dockerfile").read_text()

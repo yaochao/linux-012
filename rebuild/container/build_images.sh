@@ -20,7 +20,10 @@ ROOTFS_TAR="$CONTAINER_WORK_ROOT/rootfs.tar"
 STAGING_DIR="$CONTAINER_WORK_ROOT/rootfs"
 USERLAND_BUILD="$CONTAINER_WORK_ROOT/userland"
 ROOT_PARTITION_IMAGE="$CONTAINER_WORK_ROOT/rootfs.img"
+REFERENCE_TIMESTAMP="$CONTAINER_WORK_ROOT/rootfs.timestamp"
 export LIBGUESTFS_BACKEND=direct
+export LC_ALL=C
+export TZ=UTC
 
 cleanup() {
     rm -rf "$CONTAINER_WORK_ROOT"
@@ -68,6 +71,7 @@ chmod 755 "$STAGING_DIR/bin/sh" "$STAGING_DIR/bin/ls"
 
 truncate -s 62447616 "$DISK_IMAGE"
 sfdisk "$DISK_IMAGE" < "$ROOTFS_DIR/layout.sfdisk" >>"$BUILD_LOG" 2>&1
+printf '\0\0\0\0' | dd of="$DISK_IMAGE" bs=1 seek=440 conv=notrunc >>"$BUILD_LOG" 2>&1
 ROOT_PARTITION_SECTORS=$(awk -F'[=, ]+' '/size=/{for (i = 1; i <= NF; i++) if ($i == "size") {print $(i + 1); exit}}' "$ROOTFS_DIR/layout.sfdisk")
 [ -n "$ROOT_PARTITION_SECTORS" ]
 truncate -s "$((ROOT_PARTITION_SECTORS * 512))" "$ROOT_PARTITION_IMAGE"
@@ -81,7 +85,10 @@ while IFS=' ' read -r kind mode major minor relative_path; do
     chmod "$mode" "$STAGING_DIR/$relative_path"
 done < "$DEVICES_FILE"
 
-tar -C "$STAGING_DIR" -cpf "$ROOTFS_TAR" . >>"$BUILD_LOG" 2>&1
+touch -t 199301010000.00 "$REFERENCE_TIMESTAMP"
+find "$STAGING_DIR" -exec touch -h -r "$REFERENCE_TIMESTAMP" {} +
+tar --sort=name --mtime="1993-01-01 00:00:00Z" --owner=0 --group=0 --numeric-owner \
+    -C "$STAGING_DIR" -cpf "$ROOTFS_TAR" . >>"$BUILD_LOG" 2>&1
 
 guestfish --format=raw -a "$ROOT_PARTITION_IMAGE" >>"$BUILD_LOG" 2>&1 <<EOF
 run
