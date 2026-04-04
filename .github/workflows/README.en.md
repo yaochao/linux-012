@@ -2,9 +2,11 @@
 
 [中文 README](./README.md)
 
-This directory stores the GitHub Actions workflows. The current workflow verifies that the repository still completes unit tests, source build, and Linux 0.12 boot verification on Ubuntu 22.04.
+This directory stores the GitHub Actions workflows. It now includes both continuous integration and GitHub Release asset publication workflows.
 
 ## Current File
 
 - `ci.yml`
   continuous integration workflow covering tests, build, and `ls` boot verification
+- `release.yml`
+  release workflow that rebuilds images from source and uploads them to GitHub Release on a tag push or manual dispatch, with optional `source_ref` support for manual republish runs

@@ -34,6 +34,8 @@
 
 当前正式发布版本：`v1.0.0`
 
+仓库还带有自动发布资产的 GitHub Actions 工作流：推送 `v*` tag，或者手动触发 `.github/workflows/release.yml`，都会从源码重建镜像、执行一次真实启动验证，并把 `bootimage-0.12-hd`、`hdc-0.12.img.xz`、`manifest.json` 上传到对应的 GitHub Release。手动触发时还可以额外指定 `source_ref`，用于从当前 `main` 或其他 ref 重新发布某个已有 release 的资产。
+
 ## 支持的宿主机
 
 - macOS arm64

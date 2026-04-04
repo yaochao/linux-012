@@ -1,0 +1,99 @@
+name: Release Assets
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing git tag to publish assets for
+        required: true
+        type: string
+      source_ref:
+        description: Optional git ref to build from when manually republishing assets
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  linux-012-release-assets:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Resolve release tag
+        id: release_meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.release_tag }}"
+            source_ref="${{ inputs.source_ref }}"
+            if [[ -z "$source_ref" ]]; then
+              source_ref="refs/tags/$tag"
+            fi
+          else
+            tag="${GITHUB_REF_NAME}"
+            source_ref="${GITHUB_REF}"
+          fi
+          if [[ -z "$tag" ]]; then
+            echo "Release tag is required." >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.release_meta.outputs.source_ref }}
+
+      - name: Verify tag exists locally
+        run: git rev-parse --verify refs/tags/${{ steps.release_meta.outputs.tag }}
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Check host dependencies
+        run: ./scripts/bootstrap-host.sh
+
+      - name: Build Linux 0.12 images from source
+        run: python3 rebuild/driver.py build
+
+      - name: Verify Linux 0.12 boots and runs ls
+        run: ./scripts/verify.sh
+
+      - name: Prepare release assets from repo build outputs
+        run: python3 rebuild/driver.py prepare-release-assets --release-tag ${{ steps.release_meta.outputs.tag }}
+
+      - name: Upload release workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-012-release-assets-${{ steps.release_meta.outputs.tag }}
+          path: |
+            images/bootimage-0.12-hd
+            images/hdc-0.12.img.xz
+            images/manifest.json
+            out/verify
+            rebuild/out/logs
+
+      - name: Create or update GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.release_meta.outputs.tag }}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --generate-notes
+          gh release upload "$tag" \
+            images/bootimage-0.12-hd \
+            images/hdc-0.12.img.xz \
+            images/manifest.json \
+            --clobber

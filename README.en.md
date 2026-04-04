@@ -34,6 +34,8 @@ This is not a “download a historical image and boot it” repo. It is a “reb
 
 Current formal release: `v1.0.0`
 
+The repository also includes an automated GitHub Actions release workflow: pushing a `v*` tag, or manually dispatching `.github/workflows/release.yml`, rebuilds the images from source, runs a real boot verification, and uploads `bootimage-0.12-hd`, `hdc-0.12.img.xz`, and `manifest.json` to the matching GitHub Release. Manual dispatch also accepts an optional `source_ref`, which is useful when republishing an existing release from the current `main` branch or another ref.
+
 ## Supported Hosts
 
 - macOS arm64

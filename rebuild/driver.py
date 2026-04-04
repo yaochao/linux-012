@@ -121,12 +121,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "verify-userland",
             "check-repo-images",
             "fetch-release-images",
+            "prepare-release-assets",
             "run-repo-images",
             "run-repo-images-window",
             "build-and-run-repo-images",
             "build-and-run-repo-images-window",
         ],
     )
+    parser.add_argument("--release-tag")
+    parser.add_argument("--download-base-url")
     return parser.parse_args(argv)
 
 
@@ -280,9 +283,17 @@ def preserve_release_metadata(paths: BuildPaths, assets: dict[str, dict[str, obj
     return tag, default_release_base_url(paths.root, tag)
 
 
-def write_repo_manifest(paths: BuildPaths) -> None:
+def write_repo_manifest(
+    paths: BuildPaths,
+    *,
+    release_tag: str | None = None,
+    download_base_url: str | None = None,
+) -> None:
     assets = current_repo_asset_records(paths)
-    release_tag, download_base_url = preserve_release_metadata(paths, assets)
+    if release_tag is None and download_base_url is None:
+        release_tag, download_base_url = preserve_release_metadata(paths, assets)
+    elif download_base_url is None:
+        download_base_url = default_release_base_url(paths.root, release_tag)
     manifest = {
         "version": 1,
         "release_tag": release_tag,
@@ -399,17 +410,41 @@ def fetch_release_images(paths: BuildPaths) -> int:
     return check_repo_images(paths)
 
 
-def sync_repo_images(paths: BuildPaths) -> int:
+def sync_repo_images(
+    paths: BuildPaths,
+    *,
+    release_tag: str | None = None,
+    download_base_url: str | None = None,
+) -> int:
     if not require_rebuilt_images(paths):
         return 1
     paths.repo_images_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(paths.boot_image, paths.repo_boot_image)
     compress_image_snapshot(paths.hard_disk_image, paths.repo_hard_disk_image_archive)
-    write_repo_manifest(paths)
+    write_repo_manifest(paths, release_tag=release_tag, download_base_url=download_base_url)
     legacy_image = paths.repo_images_dir / "hdc-0.12.img"
     if legacy_image.exists():
         legacy_image.unlink()
     return 0
+
+
+def prepare_release_assets(
+    paths: BuildPaths,
+    *,
+    release_tag: str | None,
+    download_base_url: str | None = None,
+) -> int:
+    tag = release_tag or exact_git_tag(paths.root)
+    if not tag:
+        print(
+            "Release asset preparation needs `--release-tag` or an exact git tag checkout.",
+            file=sys.stderr,
+        )
+        return 1
+    status = sync_repo_images(paths, release_tag=tag, download_base_url=download_base_url)
+    if status != 0:
+        return status
+    return check_repo_images(paths)
 
 
 def ensure_repo_runtime_images(paths: BuildPaths) -> int:
@@ -473,6 +508,12 @@ def main(argv: list[str] | None = None) -> int:
         return check_repo_images(paths)
     if args.command == "fetch-release-images":
         return fetch_release_images(paths)
+    if args.command == "prepare-release-assets":
+        return prepare_release_assets(
+            paths,
+            release_tag=args.release_tag,
+            download_base_url=args.download_base_url,
+        )
     if args.command == "run":
         return run_runtime(paths, mode="run")
     if args.command == "verify":

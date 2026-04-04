@@ -2,7 +2,7 @@
 
 [中文 README](./README.md)
 
-This directory stores GitHub-specific configuration. At the moment it mainly contains the continuous integration workflow definitions.
+This directory stores GitHub-specific configuration. It currently contains both continuous integration and release-asset workflow definitions.
 
 ## Main Contents
 

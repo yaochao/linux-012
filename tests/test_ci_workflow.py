@@ -28,6 +28,29 @@ class GitHubActionsWorkflowTest(unittest.TestCase):
         self.assertIn("actions/checkout@v5", text)
         self.assertIn("actions/upload-artifact@v6", text)
 
+    def test_release_workflow_exists_and_publishes_release_assets(self) -> None:
+        workflow = ROOT / ".github" / "workflows" / "release.yml"
+
+        self.assertTrue(workflow.exists(), workflow)
+        text = workflow.read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", text)
+        self.assertIn("tags:", text)
+        self.assertIn("v*", text)
+        self.assertIn("contents: write", text)
+        self.assertIn("ubuntu-22.04", text)
+        self.assertIn("python3 -m unittest discover -s tests -v", text)
+        self.assertIn("./scripts/bootstrap-host.sh", text)
+        self.assertIn("python3 rebuild/driver.py build", text)
+        self.assertIn("./scripts/verify.sh", text)
+        self.assertIn("python3 rebuild/driver.py prepare-release-assets --release-tag", text)
+        self.assertIn("gh release create", text)
+        self.assertIn("gh release upload", text)
+        self.assertIn("images/bootimage-0.12-hd", text)
+        self.assertIn("images/hdc-0.12.img.xz", text)
+        self.assertIn("images/manifest.json", text)
+        self.assertIn("actions/checkout@v5", text)
+        self.assertIn("actions/upload-artifact@v6", text)
+
 
 if __name__ == "__main__":
     unittest.main()

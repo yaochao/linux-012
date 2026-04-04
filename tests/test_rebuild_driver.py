@@ -12,6 +12,7 @@ from rebuild.driver import (
     ensure_repo_runtime_images,
     fetch_release_images,
     parse_args,
+    prepare_release_assets,
     sync_repo_images,
     verify_environment,
 )
@@ -61,12 +62,28 @@ class RebuildDriverTest(unittest.TestCase):
             "verify-userland",
             "check-repo-images",
             "fetch-release-images",
+            "prepare-release-assets",
             "run-repo-images",
             "build-and-run-repo-images",
             "run-repo-images-window",
             "build-and-run-repo-images-window",
         ):
             self.assertEqual(command, parse_args([command]).command)
+
+    def test_parse_args_supports_release_asset_metadata(self) -> None:
+        args = parse_args(
+            [
+                "prepare-release-assets",
+                "--release-tag",
+                "v9.9.9",
+                "--download-base-url",
+                "https://example.invalid/releases/download/v9.9.9",
+            ]
+        )
+
+        self.assertEqual("prepare-release-assets", args.command)
+        self.assertEqual("v9.9.9", args.release_tag)
+        self.assertEqual("https://example.invalid/releases/download/v9.9.9", args.download_base_url)
 
     def test_verify_environment_points_runtime_at_rebuild_outputs(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
@@ -191,6 +208,30 @@ class RebuildDriverTest(unittest.TestCase):
             self.assertEqual(0, fetch_release_images(paths))
             self.assertEqual(boot, paths.repo_boot_image.read_bytes())
             self.assertEqual(disk, paths.repo_hard_disk_image_archive.read_bytes())
+
+    def test_prepare_release_assets_writes_manifest_for_requested_tag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            paths = BuildPaths.from_root(root)
+            paths.images_dir.mkdir(parents=True)
+            paths.boot_image.write_bytes(b"boot")
+            paths.hard_disk_image.write_bytes(b"disk" * 4096)
+
+            status = prepare_release_assets(
+                paths,
+                release_tag="v9.9.9",
+                download_base_url="https://example.invalid/releases/download/v9.9.9",
+            )
+
+            self.assertEqual(0, status)
+            manifest = json.loads(paths.repo_manifest.read_text(encoding="utf-8"))
+            self.assertEqual("v9.9.9", manifest["release_tag"])
+            self.assertEqual(
+                "https://example.invalid/releases/download/v9.9.9",
+                manifest["download_base_url"],
+            )
+            self.assertTrue(paths.repo_boot_image.exists())
+            self.assertTrue(paths.repo_hard_disk_image_archive.exists())
 
     def test_build_script_references_source_tarball_userland_and_manifest(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]

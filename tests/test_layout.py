@@ -17,6 +17,7 @@ class LayoutTest(unittest.TestCase):
             ROOT / ".github" / "workflows" / "README.md",
             ROOT / ".github" / "workflows" / "README.en.md",
             ROOT / ".github" / "workflows" / "ci.yml",
+            ROOT / ".github" / "workflows" / "release.yml",
             ROOT / "images",
             ROOT / "images" / "bootimage-0.12-hd",
             ROOT / "images" / "hdc-0.12.img.xz",
