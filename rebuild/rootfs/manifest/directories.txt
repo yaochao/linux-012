@@ -1,0 +1,6 @@
+bin
+dev
+etc
+tmp
+usr
+usr/root

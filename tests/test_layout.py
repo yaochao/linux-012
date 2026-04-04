@@ -13,9 +13,15 @@ class LayoutTest(unittest.TestCase):
             ROOT / "rebuild" / "Dockerfile",
             ROOT / "rebuild" / "driver.py",
             ROOT / "rebuild" / "container" / "build_images.sh",
-            ROOT / "rebuild" / "container" / "capture_rootfs.sh",
+            ROOT / "rebuild" / "tools" / "aout_pack.py",
             ROOT / "rebuild" / "patches" / "linux-0.12",
             ROOT / "rebuild" / "rootfs",
+            ROOT / "rebuild" / "rootfs" / "manifest",
+            ROOT / "rebuild" / "userland" / "include" / "linux012.h",
+            ROOT / "rebuild" / "userland" / "src" / "crt0.S",
+            ROOT / "rebuild" / "userland" / "src" / "lib.c",
+            ROOT / "rebuild" / "userland" / "src" / "sh.c",
+            ROOT / "rebuild" / "userland" / "src" / "ls.c",
             ROOT / "rebuild" / "out",
             ROOT / "scripts" / "bootstrap-host.sh",
             ROOT / "scripts" / "run.sh",
@@ -28,7 +34,6 @@ class LayoutTest(unittest.TestCase):
             ROOT / "scripts" / "verify.cmd",
             ROOT / "vendor" / "README.md",
             ROOT / "vendor" / "src",
-            ROOT / "vendor" / "images",
         ]
 
         missing = [str(path.relative_to(ROOT)) for path in expected if not path.exists()]
