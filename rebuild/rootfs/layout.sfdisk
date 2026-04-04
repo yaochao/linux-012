@@ -1,0 +1,4 @@
+label: dos
+unit: sectors
+
+start=1, size=120959, type=81, bootable

@@ -41,6 +41,23 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertIn("vendor/src/linux-0.12.tar.gz", text)
         self.assertIn("rebuild/patches/linux-0.12", text)
         self.assertIn("bootimage-0.12-hd", text)
+        self.assertIn("guestfish", text)
+        self.assertNotIn("mount -t minix", text)
+
+    def test_capture_script_uses_guestfish_for_minix_export(self) -> None:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "rebuild" / "container" / "capture_rootfs.sh").read_text()
+
+        self.assertIn("guestfish", text)
+        self.assertIn("tar-out", text)
+        self.assertNotIn("mount -t minix", text)
+
+    def test_dockerfile_installs_libguestfs_tools(self) -> None:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "rebuild" / "Dockerfile").read_text()
+
+        self.assertIn("libguestfs-tools", text)
+        self.assertIn("linux-image-kvm", text)
 
 
 if __name__ == "__main__":

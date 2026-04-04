@@ -17,6 +17,16 @@ class AssetTest(unittest.TestCase):
             self.assertTrue(asset.exists(), asset)
             self.assertGreater(asset.stat().st_size, 0, asset)
 
+    def test_rebuild_rootfs_assets_exist_and_are_non_empty(self) -> None:
+        assets = [
+            ROOT / "rebuild" / "rootfs" / "base.tar",
+            ROOT / "rebuild" / "rootfs" / "layout.sfdisk",
+        ]
+
+        for asset in assets:
+            self.assertTrue(asset.exists(), asset)
+            self.assertGreater(asset.stat().st_size, 0, asset)
+
 
 if __name__ == "__main__":
     unittest.main()
