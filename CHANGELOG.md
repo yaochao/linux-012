@@ -2,6 +2,19 @@
 
 [English CHANGELOG](./CHANGELOG.en.md)
 
+## v1.0.1
+
+发布日期：2026-04-04
+
+这是 `v1.0.0` 之后的维护发布，重点是把仓库快照、GitHub Release 资产和仓库首页展示收口到一致状态。
+
+### 本次修复
+
+- 运行时镜像的构建结果现在是可复现的：固定了根文件系统时间戳和 MBR disk identifier，连续两次构建会得到相同的系统镜像快照
+- GitHub Release 资产发布已经自动化，推送 `v*` tag 或手动触发发布工作流时，会从源码重建镜像、执行启动验证并上传 release 资产
+- `fetch-release-images` 重新拉回的资产现在会和仓库内 `images/manifest.json` 严格一致
+- GitHub 仓库首页不再错误显示 `.github` 目录说明，而是显示根目录 `README.md`
+
 ## v1.0.0
 
 发布日期：2026-04-04

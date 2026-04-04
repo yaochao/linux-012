@@ -2,6 +2,19 @@
 
 [中文变更日志](./CHANGELOG.md)
 
+## v1.0.1
+
+Release date: 2026-04-04
+
+This is the maintenance release after `v1.0.0`, focused on bringing the repo snapshots, GitHub Release assets, and repository homepage rendering back into a consistent state.
+
+### Fixes In This Release
+
+- runtime image builds are now reproducible by normalizing root filesystem timestamps and the MBR disk identifier, so consecutive builds produce identical system image snapshots
+- GitHub Release asset publication is now automated: pushing a `v*` tag, or manually dispatching the release workflow, rebuilds the images from source, runs boot verification, and uploads the release assets
+- assets restored by `fetch-release-images` now match `images/manifest.json` exactly
+- the GitHub repository homepage now renders the root `README.md` instead of the `.github` directory overview
+
 ## v1.0.0
 
 Release date: 2026-04-04
