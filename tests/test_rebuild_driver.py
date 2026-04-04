@@ -1,12 +1,16 @@
+import hashlib
+import json
 import pathlib
 import tempfile
 import unittest
 
 from rebuild.driver import (
     BuildPaths,
+    check_repo_images,
     docker_build_command,
     docker_run_command,
     ensure_repo_runtime_images,
+    fetch_release_images,
     parse_args,
     sync_repo_images,
     verify_environment,
@@ -24,6 +28,7 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertEqual(root / "images", paths.repo_images_dir)
         self.assertEqual(root / "images" / "bootimage-0.12-hd", paths.repo_boot_image)
         self.assertEqual(root / "images" / "hdc-0.12.img.xz", paths.repo_hard_disk_image_archive)
+        self.assertEqual(root / "images" / "manifest.json", paths.repo_manifest)
         self.assertEqual(root / "out" / "repo-images" / "hdc-0.12.img", paths.repo_runtime_hard_disk_image)
 
     def test_docker_run_command_uses_linux_amd64_and_privileged_mode(self) -> None:
@@ -54,6 +59,8 @@ class RebuildDriverTest(unittest.TestCase):
             "run",
             "verify",
             "verify-userland",
+            "check-repo-images",
+            "fetch-release-images",
             "run-repo-images",
             "build-and-run-repo-images",
             "run-repo-images-window",
@@ -94,6 +101,7 @@ class RebuildDriverTest(unittest.TestCase):
             self.assertEqual(b"boot", paths.repo_boot_image.read_bytes())
             self.assertTrue(paths.repo_hard_disk_image_archive.exists())
             self.assertGreater(paths.repo_hard_disk_image_archive.stat().st_size, 0)
+            self.assertTrue(paths.repo_manifest.exists())
             self.assertFalse((paths.repo_images_dir / "hdc-0.12.img").exists())
 
     def test_ensure_repo_runtime_images_extracts_repo_disk_archive(self) -> None:
@@ -115,6 +123,74 @@ class RebuildDriverTest(unittest.TestCase):
 
             self.assertEqual(0, status)
             self.assertEqual(b"disk" * 4096, paths.repo_runtime_hard_disk_image.read_bytes())
+
+    def test_check_repo_images_validates_repo_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            paths = BuildPaths.from_root(root)
+            paths.repo_images_dir.mkdir(parents=True)
+            boot = b"boot"
+            disk = b"disk-image"
+            paths.repo_boot_image.write_bytes(boot)
+            paths.repo_hard_disk_image_archive.write_bytes(disk)
+            paths.repo_manifest.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "release_tag": "v1.0.0",
+                        "download_base_url": "https://example.invalid/releases/v1.0.0",
+                        "assets": {
+                            "bootimage-0.12-hd": {
+                                "sha256": hashlib.sha256(boot).hexdigest(),
+                                "size": len(boot),
+                            },
+                            "hdc-0.12.img.xz": {
+                                "sha256": hashlib.sha256(disk).hexdigest(),
+                                "size": len(disk),
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(0, check_repo_images(paths))
+
+    def test_fetch_release_images_downloads_assets_declared_in_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            release_dir = root / "release"
+            release_dir.mkdir()
+            boot = b"boot"
+            disk = b"disk-image"
+            (release_dir / "bootimage-0.12-hd").write_bytes(boot)
+            (release_dir / "hdc-0.12.img.xz").write_bytes(disk)
+            paths = BuildPaths.from_root(root)
+            paths.repo_images_dir.mkdir(parents=True)
+            paths.repo_manifest.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "release_tag": "v1.0.0",
+                        "download_base_url": release_dir.as_uri(),
+                        "assets": {
+                            "bootimage-0.12-hd": {
+                                "sha256": hashlib.sha256(boot).hexdigest(),
+                                "size": len(boot),
+                            },
+                            "hdc-0.12.img.xz": {
+                                "sha256": hashlib.sha256(disk).hexdigest(),
+                                "size": len(disk),
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(0, fetch_release_images(paths))
+            self.assertEqual(boot, paths.repo_boot_image.read_bytes())
+            self.assertEqual(disk, paths.repo_hard_disk_image_archive.read_bytes())
 
     def test_build_script_references_source_tarball_userland_and_manifest(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]

@@ -9,6 +9,7 @@
 
 - `images/bootimage-0.12-hd`
 - `images/hdc-0.12.img.xz`
+- `images/manifest.json`
 
 同一套源码构建链还会在本地生成工作镜像：
 
@@ -95,6 +96,48 @@ scripts\bootstrap-host.cmd
 ```
 
 ### 3. 直接启动仓库内置镜像
+
+如果你想先检查仓库快照是否完整，可以运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/check-images.sh
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\check-images.ps1
+```
+
+Windows CMD：
+
+```bat
+scripts\check-images.cmd
+```
+
+如果你删掉了 `images/` 里的运行快照，想从当前发布版本重新拉回它们，可以运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/fetch-release-images.sh
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\fetch-release-images.ps1
+```
+
+Windows CMD：
+
+```bat
+scripts\fetch-release-images.cmd
+```
+
+这条入口会根据 `images/manifest.json` 里的发布地址和 SHA-256 摘要下载并校验仓库快照。
 
 如果你只是想立即启动 Linux 0.12，直接运行：
 
@@ -244,6 +287,18 @@ scripts\verify-userland.cmd
 python3 rebuild/driver.py run-repo-images
 ```
 
+校验仓库镜像快照：
+
+```sh
+python3 rebuild/driver.py check-repo-images
+```
+
+从 GitHub Release 重新拉取仓库镜像快照：
+
+```sh
+python3 rebuild/driver.py fetch-release-images
+```
+
 直接弹出可见的 QEMU 窗口：
 
 ```sh
@@ -317,6 +372,7 @@ python3 rebuild/driver.py run
 - `rebuild/out/images/hdc-0.12.img`
 - `images/bootimage-0.12-hd`
 - `images/hdc-0.12.img.xz`
+- `images/manifest.json`
 - `out/repo-images/hdc-0.12.img`
 - `out/verify/screen.txt`
 - `out/verify-userland/screen.txt`
@@ -359,6 +415,8 @@ python3 rebuild/driver.py run
   不同宿主机的入口脚本
 - `images/`
   提交到仓库中的自编译运行镜像快照，其中系统镜像以压缩形式保存
+- `images/manifest.json`
+  仓库快照的 SHA-256、大小和发布下载地址清单
 - `rebuild/driver.py`
   源码构建、运行和验证入口
 - `rebuild/container/build_images.sh`
@@ -381,6 +439,8 @@ python3 rebuild/driver.py run
 ## 运行说明
 
 - 启动镜像本身不足 1.44MB，驱动会在启动前补齐成标准软盘镜像
+- `scripts/check-images.*` 会按 `images/manifest.json` 校验仓库快照
+- `scripts/fetch-release-images.*` 会从 `images/manifest.json` 指向的 GitHub Release 重新拉取仓库快照
 - `scripts/run.*` 默认直接使用仓库里的 `images/` 快照，并在 `out/repo-images/` 里自动解包系统镜像
 - `scripts/run-window.*` 默认直接使用仓库里的 `images/` 快照，并在 `out/repo-images/` 里自动解包系统镜像后弹出可见的 QEMU 窗口
 - `scripts/build-and-run.*` 会重编源码并刷新 `images/`

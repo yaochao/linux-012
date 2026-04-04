@@ -16,6 +16,10 @@ This directory stores host-facing one-command entry scripts. Each platform has i
   rebuild first, then boot
 - `build-and-run-window.*`
   rebuild first, then boot in a visible QEMU window
+- `check-images.*`
+  verify the repo-managed snapshots against the committed manifest
+- `fetch-release-images.*`
+  restore the repo-managed snapshots from the GitHub Release
 - `verify.*`
   boot automatically and verify `ls`
 - `verify-userland.*`

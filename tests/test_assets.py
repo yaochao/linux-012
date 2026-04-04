@@ -19,6 +19,7 @@ class AssetTest(unittest.TestCase):
         assets = [
             ROOT / "images" / "bootimage-0.12-hd",
             ROOT / "images" / "hdc-0.12.img.xz",
+            ROOT / "images" / "manifest.json",
         ]
 
         for asset in assets:

@@ -16,6 +16,10 @@
   先编译再启动
 - `build-and-run-window.*`
   先编译再启动，并弹出可见 QEMU 窗口
+- `check-images.*`
+  校验仓库镜像快照和清单
+- `fetch-release-images.*`
+  从 GitHub Release 恢复仓库镜像快照
 - `verify.*`
   自动启动并验证 `ls`
 - `verify-userland.*`

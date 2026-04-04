@@ -88,6 +88,18 @@ class ScriptTest(unittest.TestCase):
         self.assertIn("rebuild/driver.py", text)
         self.assertIn("build-and-run-repo-images", text)
 
+    def test_check_images_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "check-images.sh").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("check-repo-images", text)
+
+    def test_fetch_release_images_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "fetch-release-images.sh").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("fetch-release-images", text)
+
     def test_build_and_run_window_script_calls_python_driver(self) -> None:
         text = (ROOT / "scripts" / "build-and-run-window.sh").read_text()
 
@@ -99,6 +111,18 @@ class ScriptTest(unittest.TestCase):
 
         self.assertIn("rebuild/driver.py", text)
         self.assertIn("build-and-run-repo-images", text)
+
+    def test_windows_check_images_powershell_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "check-images.ps1").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("check-repo-images", text)
+
+    def test_windows_fetch_release_images_powershell_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "fetch-release-images.ps1").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("fetch-release-images", text)
 
     def test_windows_build_and_run_window_powershell_script_calls_python_driver(self) -> None:
         text = (ROOT / "scripts" / "build-and-run-window.ps1").read_text()
@@ -117,6 +141,18 @@ class ScriptTest(unittest.TestCase):
 
         self.assertIn("powershell", text.lower())
         self.assertIn("build-and-run-window.ps1", text)
+
+    def test_windows_check_images_batch_script_delegates_to_powershell(self) -> None:
+        text = (ROOT / "scripts" / "check-images.cmd").read_text()
+
+        self.assertIn("powershell", text.lower())
+        self.assertIn("check-images.ps1", text)
+
+    def test_windows_fetch_release_images_batch_script_delegates_to_powershell(self) -> None:
+        text = (ROOT / "scripts" / "fetch-release-images.cmd").read_text()
+
+        self.assertIn("powershell", text.lower())
+        self.assertIn("fetch-release-images.ps1", text)
 
     def test_driver_supports_dry_run(self) -> None:
         result = subprocess.run(

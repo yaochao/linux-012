@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import lzma
 import os
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
 
 CONTAINER_IMAGE = "linux-012-rebuild"
+REPO_IMAGE_ASSET_NAMES = ("bootimage-0.12-hd", "hdc-0.12.img.xz")
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,7 @@ class BuildPaths:
     hard_disk_image: Path
     repo_boot_image: Path
     repo_hard_disk_image_archive: Path
+    repo_manifest: Path
     repo_runtime_dir: Path
     repo_runtime_hard_disk_image: Path
 
@@ -48,6 +54,7 @@ class BuildPaths:
             hard_disk_image=images_dir / "hdc-0.12.img",
             repo_boot_image=repo_images_dir / "bootimage-0.12-hd",
             repo_hard_disk_image_archive=repo_images_dir / "hdc-0.12.img.xz",
+            repo_manifest=repo_images_dir / "manifest.json",
             repo_runtime_dir=repo_runtime_dir,
             repo_runtime_hard_disk_image=repo_runtime_dir / "hdc-0.12.img",
         )
@@ -112,6 +119,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "run",
             "verify",
             "verify-userland",
+            "check-repo-images",
+            "fetch-release-images",
             "run-repo-images",
             "run-repo-images-window",
             "build-and-run-repo-images",
@@ -158,15 +167,147 @@ def ensure_rebuilt_images(paths: BuildPaths) -> int:
     return run_build(paths)
 
 
+def repo_image_paths(paths: BuildPaths) -> dict[str, Path]:
+    return {
+        "bootimage-0.12-hd": paths.repo_boot_image,
+        "hdc-0.12.img.xz": paths.repo_hard_disk_image_archive,
+    }
+
+
+def hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                return digest.hexdigest()
+            digest.update(chunk)
+
+
+def parse_github_remote(remote: str) -> str | None:
+    text = remote.strip()
+    if not text:
+        return None
+    if text.startswith("git@github.com:"):
+        slug = text.removeprefix("git@github.com:")
+    elif text.startswith("https://github.com/"):
+        slug = text.removeprefix("https://github.com/")
+    elif text.startswith("http://github.com/"):
+        slug = text.removeprefix("http://github.com/")
+    else:
+        return None
+    if slug.endswith(".git"):
+        slug = slug[:-4]
+    parts = [part for part in slug.split("/") if part]
+    if len(parts) != 2:
+        return None
+    return "/".join(parts)
+
+
+def exact_git_tag(root: Path) -> str | None:
+    completed = subprocess.run(
+        ["git", "describe", "--tags", "--exact-match"],
+        cwd=root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        return None
+    tag = completed.stdout.strip()
+    return tag or None
+
+
+def default_release_base_url(root: Path, tag: str | None) -> str | None:
+    if not tag:
+        return None
+    completed = subprocess.run(
+        ["git", "config", "--get", "remote.origin.url"],
+        cwd=root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        return None
+    slug = parse_github_remote(completed.stdout)
+    if not slug:
+        return None
+    return f"https://github.com/{slug}/releases/download/{tag}"
+
+
+def load_repo_manifest(paths: BuildPaths) -> dict:
+    if not paths.repo_manifest.exists():
+        raise FileNotFoundError(paths.repo_manifest)
+    return json.loads(paths.repo_manifest.read_text(encoding="utf-8"))
+
+
+def repo_manifest_assets(manifest: dict) -> dict[str, dict[str, object]]:
+    assets = manifest.get("assets")
+    if not isinstance(assets, dict):
+        raise ValueError("Repo image manifest is missing the `assets` object.")
+    return assets
+
+
+def current_repo_asset_records(paths: BuildPaths) -> dict[str, dict[str, object]]:
+    records: dict[str, dict[str, object]] = {}
+    for name, path in repo_image_paths(paths).items():
+        if not path.exists() or path.stat().st_size == 0:
+            raise FileNotFoundError(path)
+        records[name] = {
+            "sha256": hash_file(path),
+            "size": int(path.stat().st_size),
+        }
+    return records
+
+
+def preserve_release_metadata(paths: BuildPaths, assets: dict[str, dict[str, object]]) -> tuple[str | None, str | None]:
+    try:
+        existing = load_repo_manifest(paths)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        existing = None
+    if existing is not None:
+        try:
+            existing_assets = repo_manifest_assets(existing)
+        except ValueError:
+            existing_assets = {}
+        if all(existing_assets.get(name) == record for name, record in assets.items()):
+            tag = existing.get("release_tag")
+            base_url = existing.get("download_base_url")
+            if isinstance(tag, str) and tag and isinstance(base_url, str) and base_url:
+                return tag, base_url
+    tag = exact_git_tag(paths.root)
+    return tag, default_release_base_url(paths.root, tag)
+
+
+def write_repo_manifest(paths: BuildPaths) -> None:
+    assets = current_repo_asset_records(paths)
+    release_tag, download_base_url = preserve_release_metadata(paths, assets)
+    manifest = {
+        "version": 1,
+        "release_tag": release_tag,
+        "download_base_url": download_base_url,
+        "assets": assets,
+    }
+    paths.repo_images_dir.mkdir(parents=True, exist_ok=True)
+    temporary = paths.repo_manifest.with_name(f"{paths.repo_manifest.name}.tmp")
+    temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(paths.repo_manifest)
+
+
 def require_repo_images(paths: BuildPaths) -> bool:
-    required = [paths.repo_boot_image, paths.repo_hard_disk_image_archive]
+    required = [paths.repo_boot_image, paths.repo_hard_disk_image_archive, paths.repo_manifest]
     missing = [path for path in required if not path.exists() or path.stat().st_size == 0]
     if not missing:
         return True
     print("Missing repo-managed runtime images:", file=sys.stderr)
     for path in missing:
         print(f"  {path}", file=sys.stderr)
-    print("Run `python3 rebuild/driver.py build-and-run-repo-images` first.", file=sys.stderr)
+    print(
+        "Run `python3 rebuild/driver.py fetch-release-images` or "
+        "`python3 rebuild/driver.py build-and-run-repo-images` first.",
+        file=sys.stderr,
+    )
     return False
 
 
@@ -187,12 +328,84 @@ def extract_image_snapshot(source: Path, target: Path) -> None:
     os.utime(target, ns=(source.stat().st_mtime_ns, source.stat().st_mtime_ns))
 
 
+def check_repo_images(paths: BuildPaths) -> int:
+    if not require_repo_images(paths):
+        return 1
+    try:
+        manifest = load_repo_manifest(paths)
+        assets = repo_manifest_assets(manifest)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
+        print(f"Invalid repo image manifest: {exc}", file=sys.stderr)
+        return 1
+    errors: list[str] = []
+    for name in REPO_IMAGE_ASSET_NAMES:
+        record = assets.get(name)
+        if not isinstance(record, dict):
+            errors.append(f"Missing manifest entry for `{name}`.")
+            continue
+        path = repo_image_paths(paths)[name]
+        if not path.exists():
+            errors.append(f"Missing repo image file `{path}`.")
+            continue
+        expected_size = record.get("size")
+        actual_size = int(path.stat().st_size)
+        if expected_size != actual_size:
+            errors.append(f"Size mismatch for `{name}`: expected {expected_size}, got {actual_size}.")
+            continue
+        expected_hash = record.get("sha256")
+        actual_hash = hash_file(path)
+        if expected_hash != actual_hash:
+            errors.append(f"SHA-256 mismatch for `{name}`: expected {expected_hash}, got {actual_hash}.")
+    if errors:
+        print("Repo image snapshot verification failed:", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+        return 1
+    print("Repo image snapshots verified.")
+    return 0
+
+
+def download_file(url: str, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f"{target.name}.tmp")
+    with urllib.request.urlopen(url) as response, temporary.open("wb") as handle:
+        shutil.copyfileobj(response, handle)
+    temporary.replace(target)
+
+
+def fetch_release_images(paths: BuildPaths) -> int:
+    try:
+        manifest = load_repo_manifest(paths)
+        assets = repo_manifest_assets(manifest)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
+        print(f"Cannot fetch release images without a valid repo image manifest: {exc}", file=sys.stderr)
+        return 1
+    base_url = manifest.get("download_base_url")
+    if not isinstance(base_url, str) or not base_url:
+        print("This checkout is not tied to a published GitHub Release asset set.", file=sys.stderr)
+        return 1
+    paths.repo_images_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        for name in REPO_IMAGE_ASSET_NAMES:
+            if name not in assets:
+                raise ValueError(f"Manifest is missing asset `{name}`.")
+            download_file(f"{base_url.rstrip('/')}/{name}", repo_image_paths(paths)[name])
+    except (OSError, urllib.error.URLError, ValueError) as exc:
+        print(f"Failed to download release images: {exc}", file=sys.stderr)
+        return 1
+    legacy_image = paths.repo_images_dir / "hdc-0.12.img"
+    if legacy_image.exists():
+        legacy_image.unlink()
+    return check_repo_images(paths)
+
+
 def sync_repo_images(paths: BuildPaths) -> int:
     if not require_rebuilt_images(paths):
         return 1
     paths.repo_images_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(paths.boot_image, paths.repo_boot_image)
     compress_image_snapshot(paths.hard_disk_image, paths.repo_hard_disk_image_archive)
+    write_repo_manifest(paths)
     legacy_image = paths.repo_images_dir / "hdc-0.12.img"
     if legacy_image.exists():
         legacy_image.unlink()
@@ -200,7 +413,7 @@ def sync_repo_images(paths: BuildPaths) -> int:
 
 
 def ensure_repo_runtime_images(paths: BuildPaths) -> int:
-    if not require_repo_images(paths):
+    if check_repo_images(paths) != 0:
         return 1
     archive = paths.repo_hard_disk_image_archive
     runtime_image = paths.repo_runtime_hard_disk_image
@@ -256,6 +469,10 @@ def main(argv: list[str] | None = None) -> int:
         return run_bootstrap_host(paths)
     if args.command == "build":
         return run_build(paths)
+    if args.command == "check-repo-images":
+        return check_repo_images(paths)
+    if args.command == "fetch-release-images":
+        return fetch_release_images(paths)
     if args.command == "run":
         return run_runtime(paths, mode="run")
     if args.command == "verify":

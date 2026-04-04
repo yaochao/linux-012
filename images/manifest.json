@@ -1,0 +1,15 @@
+{
+  "assets": {
+    "bootimage-0.12-hd": {
+      "sha256": "afdb7a550ee971cb4848b6cb52ef3b222511943c0187ca54371b64887143c5f7",
+      "size": 196769
+    },
+    "hdc-0.12.img.xz": {
+      "sha256": "8ac159be9cec2ab3fd1625fc725f0caedfaff47a7b0583229485128d22b6a670",
+      "size": 11692
+    }
+  },
+  "download_base_url": "https://github.com/yaochao/linux-012/releases/download/v1.0.0",
+  "release_tag": "v1.0.0",
+  "version": 1
+}

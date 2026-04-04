@@ -9,6 +9,7 @@ The repository no longer stores third-party runtime images. The repository now i
 
 - `images/bootimage-0.12-hd`
 - `images/hdc-0.12.img.xz`
+- `images/manifest.json`
 
 The same source-build workflow also produces local working images:
 
@@ -95,6 +96,48 @@ scripts\bootstrap-host.cmd
 ```
 
 ### 3. Start QEMU From The Bundled Images
+
+If you want to verify the committed snapshots before launch, run:
+
+macOS / Ubuntu:
+
+```sh
+./scripts/check-images.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\check-images.ps1
+```
+
+Windows CMD:
+
+```bat
+scripts\check-images.cmd
+```
+
+If you removed the runtime snapshots from `images/` and want to restore them from the current release, run:
+
+macOS / Ubuntu:
+
+```sh
+./scripts/fetch-release-images.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\fetch-release-images.ps1
+```
+
+Windows CMD:
+
+```bat
+scripts\fetch-release-images.cmd
+```
+
+This entrypoint downloads and verifies the repo-managed snapshots using the release metadata and SHA-256 digests stored in `images/manifest.json`.
 
 If you just want to boot Linux 0.12 immediately, run:
 
@@ -244,6 +287,18 @@ Start QEMU from the committed repo images:
 python3 rebuild/driver.py run-repo-images
 ```
 
+Verify the committed repo image snapshots:
+
+```sh
+python3 rebuild/driver.py check-repo-images
+```
+
+Fetch the committed repo image snapshots from the GitHub Release:
+
+```sh
+python3 rebuild/driver.py fetch-release-images
+```
+
 Start QEMU from the committed repo images with a visible window:
 
 ```sh
@@ -317,6 +372,7 @@ Important generated artifacts:
 - `rebuild/out/images/hdc-0.12.img`
 - `images/bootimage-0.12-hd`
 - `images/hdc-0.12.img.xz`
+- `images/manifest.json`
 - `out/repo-images/hdc-0.12.img`
 - `out/verify/screen.txt`
 - `out/verify-userland/screen.txt`
@@ -359,6 +415,8 @@ The current standalone userland binaries are:
   host-specific entry scripts
 - `images/`
   committed snapshots of the self-built runtime images, with the hard disk stored in compressed form
+- `images/manifest.json`
+  manifest containing snapshot SHA-256 digests, sizes, and release download metadata
 - `rebuild/driver.py`
   source build, runtime, and verification entrypoint
 - `rebuild/container/build_images.sh`
@@ -381,6 +439,8 @@ The current standalone userland binaries are:
 ## Runtime Notes
 
 - The boot image is shorter than 1.44MB, so the driver pads it into a full floppy image before launch
+- `scripts/check-images.*` verifies the repo-managed snapshots against `images/manifest.json`
+- `scripts/fetch-release-images.*` re-downloads the repo-managed snapshots from the GitHub Release referenced by `images/manifest.json`
 - `scripts/run.*` uses the committed snapshots in `images/` by default and unpacks the hard disk image into `out/repo-images/`
 - `scripts/run-window.*` uses the committed snapshots in `images/`, unpacks the hard disk image into `out/repo-images/`, and opens a visible QEMU window
 - `scripts/build-and-run.*` rebuilds from source and refreshes `images/`
