@@ -277,8 +277,15 @@ The repository now includes the GitHub Actions workflow [ci.yml](/Users/infoxmed
   automatic unpack of the repo-managed disk snapshot
   `py -3 tools/qemu_driver.py verify --dry-run`
   `py -3 tools/qemu_driver.py run-window --dry-run`
+- `macos-14` host smoke:
+  `brew install qemu`
+  `python3 -m unittest discover -s tests -v`
+  `python3 tools/qemu_driver.py bootstrap-host`
+  automatic unpack of the repo-managed disk snapshot
+  `python3 tools/qemu_driver.py verify --dry-run`
+  `python3 tools/qemu_driver.py run-window --dry-run`
 
-On failure it uploads Ubuntu artifacts from `out/verify` and `rebuild/out/logs`, plus the Windows smoke artifact from `out/repo-images`.
+On failure it uploads Ubuntu artifacts from `out/verify` and `rebuild/out/logs`, plus the Windows and macOS smoke artifacts from `out/repo-images`.
 
 Build the images explicitly:
 

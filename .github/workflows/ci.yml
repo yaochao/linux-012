@@ -83,3 +83,39 @@ jobs:
           name: linux-012-windows-ci-artifacts
           path: |
             out/repo-images
+
+  linux-012-macos-smoke:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install QEMU
+        run: brew install qemu
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Check macOS QEMU host dependency
+        run: python3 tools/qemu_driver.py bootstrap-host
+
+      - name: Prepare repo runtime image snapshot
+        run: |
+          python3 -c "from rebuild.driver import BuildPaths, ensure_repo_runtime_images, repo_root; import sys; paths = BuildPaths.from_root(repo_root()); raise SystemExit(ensure_repo_runtime_images(paths))"
+
+      - name: macOS dry-run verification from repo images
+        run: |
+          export LINUX012_BOOT_SOURCE_IMAGE="$PWD/images/bootimage-0.12-hd"
+          export LINUX012_HARD_DISK_IMAGE="$PWD/out/repo-images/hdc-0.12.img"
+          python3 tools/qemu_driver.py verify --dry-run
+          python3 tools/qemu_driver.py run-window --dry-run
+
+      - name: Upload macOS smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-012-macos-ci-artifacts
+          path: |
+            out/repo-images

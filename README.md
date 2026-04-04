@@ -277,8 +277,15 @@ python3 rebuild/driver.py build-and-run-repo-images-window
   基于仓库快照自动解包系统镜像
   `py -3 tools/qemu_driver.py verify --dry-run`
   `py -3 tools/qemu_driver.py run-window --dry-run`
+- `macos-14` 宿主机 smoke：
+  `brew install qemu`
+  `python3 -m unittest discover -s tests -v`
+  `python3 tools/qemu_driver.py bootstrap-host`
+  基于仓库快照自动解包系统镜像
+  `python3 tools/qemu_driver.py verify --dry-run`
+  `python3 tools/qemu_driver.py run-window --dry-run`
 
-失败时会上传 Ubuntu 的 `out/verify`、`rebuild/out/logs`，以及 Windows 的 `out/repo-images` 作为排查产物。
+失败时会上传 Ubuntu 的 `out/verify`、`rebuild/out/logs`，以及 Windows 和 macOS 的 `out/repo-images` 作为排查产物。
 
 显式构建镜像：
 
