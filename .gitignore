@@ -1,7 +1,8 @@
 .DS_Store
 .worktrees/
-out/
+/out/
 rebuild/out/*
+!rebuild/out/
 !rebuild/out/.gitkeep
 __pycache__/
 *.pyc
