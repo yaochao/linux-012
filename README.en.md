@@ -259,6 +259,17 @@ Force a fresh rebuild, sync `images/`, and then start QEMU in a visible window:
 python3 rebuild/driver.py build-and-run-repo-images-window
 ```
 
+## Continuous Integration
+
+The repository now includes the GitHub Actions workflow [ci.yml](/Users/infoxmed-01/ai/workspace/linux-012/.github/workflows/ci.yml). On pushes to `main` and pull requests targeting `main`, it runs the following on `ubuntu-22.04`:
+
+- `python3 -m unittest discover -s tests -v`
+- `./scripts/bootstrap-host.sh`
+- `python3 rebuild/driver.py build`
+- `./scripts/verify.sh`
+
+On failure it uploads `out/verify` and `rebuild/out/logs` as debugging artifacts.
+
 Build the images explicitly:
 
 ```sh

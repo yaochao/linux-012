@@ -10,6 +10,13 @@ class LayoutTest(unittest.TestCase):
     def test_expected_paths_exist(self) -> None:
         expected = [
             ROOT / "README.md",
+            ROOT / ".github",
+            ROOT / ".github" / "README.md",
+            ROOT / ".github" / "README.en.md",
+            ROOT / ".github" / "workflows",
+            ROOT / ".github" / "workflows" / "README.md",
+            ROOT / ".github" / "workflows" / "README.en.md",
+            ROOT / ".github" / "workflows" / "ci.yml",
             ROOT / "images",
             ROOT / "images" / "bootimage-0.12-hd",
             ROOT / "images" / "hdc-0.12.img",

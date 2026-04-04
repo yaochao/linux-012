@@ -259,6 +259,17 @@ python3 rebuild/driver.py build-and-run-repo-images
 python3 rebuild/driver.py build-and-run-repo-images-window
 ```
 
+## 持续集成
+
+仓库现在包含 GitHub Actions 工作流 [ci.yml](/Users/infoxmed-01/ai/workspace/linux-012/.github/workflows/ci.yml)。它会在推送到 `main` 或对 `main` 发起 Pull Request 时，在 `ubuntu-22.04` 上执行：
+
+- `python3 -m unittest discover -s tests -v`
+- `./scripts/bootstrap-host.sh`
+- `python3 rebuild/driver.py build`
+- `./scripts/verify.sh`
+
+失败时会上传 `out/verify` 和 `rebuild/out/logs` 作为排查产物。
+
 显式构建镜像：
 
 ```sh
