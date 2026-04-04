@@ -25,6 +25,8 @@ class GitHubActionsWorkflowTest(unittest.TestCase):
         self.assertIn("tools/qemu_driver.py bootstrap-host", text)
         self.assertIn("tools/qemu_driver.py verify --dry-run", text)
         self.assertIn("tools/qemu_driver.py run-window --dry-run", text)
+        self.assertIn("linux-012-reproducibility", text)
+        self.assertIn("python3 rebuild/driver.py check-reproducible-build", text)
         self.assertIn("actions/checkout@v5", text)
         self.assertIn("actions/upload-artifact@v6", text)
 
@@ -45,6 +47,7 @@ class GitHubActionsWorkflowTest(unittest.TestCase):
         self.assertIn("python3 rebuild/driver.py prepare-release-assets --release-tag", text)
         self.assertIn("gh release create", text)
         self.assertIn("gh release upload", text)
+        self.assertIn("python3 rebuild/driver.py verify-release-readback", text)
         self.assertIn("images/bootimage-0.12-hd", text)
         self.assertIn("images/hdc-0.12.img.xz", text)
         self.assertIn("images/manifest.json", text)

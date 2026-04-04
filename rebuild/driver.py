@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -119,8 +120,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "run",
             "verify",
             "verify-userland",
+            "verify-repo-images",
             "check-repo-images",
+            "check-reproducible-build",
             "fetch-release-images",
+            "verify-release-readback",
             "prepare-release-assets",
             "run-repo-images",
             "run-repo-images-window",
@@ -185,6 +189,13 @@ def hash_file(path: Path) -> str:
             if not chunk:
                 return digest.hexdigest()
             digest.update(chunk)
+
+
+def snapshot_record(path: Path) -> dict[str, object]:
+    return {
+        "sha256": hash_file(path),
+        "size": int(path.stat().st_size),
+    }
 
 
 def parse_github_remote(remote: str) -> str | None:
@@ -257,10 +268,7 @@ def current_repo_asset_records(paths: BuildPaths) -> dict[str, dict[str, object]
     for name, path in repo_image_paths(paths).items():
         if not path.exists() or path.stat().st_size == 0:
             raise FileNotFoundError(path)
-        records[name] = {
-            "sha256": hash_file(path),
-            "size": int(path.stat().st_size),
-        }
+        records[name] = snapshot_record(path)
     return records
 
 
@@ -489,6 +497,99 @@ def run_repo_runtime(paths: BuildPaths, mode: str = "run") -> int:
     )
 
 
+def verify_repo_runtime(paths: BuildPaths) -> int:
+    return run_repo_runtime(paths, mode="verify")
+
+
+def check_reproducible_build(paths: BuildPaths) -> int:
+    paths.out_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="repro-", dir=paths.out_dir) as tmp:
+        snapshot_root = Path(tmp)
+        runs: list[dict[str, dict[str, object]]] = []
+        for index in (1, 2):
+            status = run_build(paths)
+            if status != 0:
+                return status
+            run_dir = snapshot_root / f"run-{index}"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            boot_snapshot = run_dir / paths.boot_image.name
+            disk_snapshot = run_dir / paths.hard_disk_image.name
+            archive_snapshot = run_dir / paths.repo_hard_disk_image_archive.name
+            shutil.copy2(paths.boot_image, boot_snapshot)
+            shutil.copy2(paths.hard_disk_image, disk_snapshot)
+            compress_image_snapshot(disk_snapshot, archive_snapshot)
+            runs.append(
+                {
+                    "bootimage-0.12-hd": snapshot_record(boot_snapshot),
+                    "hdc-0.12.img": snapshot_record(disk_snapshot),
+                    "hdc-0.12.img.xz": snapshot_record(archive_snapshot),
+                }
+            )
+    mismatches: list[str] = []
+    first, second = runs
+    for name in ("bootimage-0.12-hd", "hdc-0.12.img", "hdc-0.12.img.xz"):
+        if first[name] != second[name]:
+            mismatches.append(f"{name}: first={first[name]} second={second[name]}")
+    if mismatches:
+        print("Reproducible build check failed.", file=sys.stderr)
+        for mismatch in mismatches:
+            print(f"  {mismatch}", file=sys.stderr)
+        return 1
+    print("Reproducible build check passed.")
+    return 0
+
+
+def backup_file(path: Path, backup_root: Path) -> Path | None:
+    if not path.exists():
+        return None
+    backup_root.mkdir(parents=True, exist_ok=True)
+    target = backup_root / path.name
+    shutil.copy2(path, target)
+    return target
+
+
+def restore_file(path: Path, backup: Path | None) -> None:
+    if backup is None:
+        if path.exists():
+            path.unlink()
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(backup, path)
+
+
+def verify_release_readback(paths: BuildPaths) -> int:
+    try:
+        repo_manifest_assets(load_repo_manifest(paths))
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
+        print(f"Cannot verify release readback without a valid repo image manifest: {exc}", file=sys.stderr)
+        return 1
+    paths.out_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="release-readback-", dir=paths.out_dir) as tmp:
+        backup_root = Path(tmp)
+        repo_boot_backup = backup_file(paths.repo_boot_image, backup_root)
+        repo_disk_backup = backup_file(paths.repo_hard_disk_image_archive, backup_root)
+        repo_manifest_backup = backup_file(paths.repo_manifest, backup_root)
+        status = 1
+        try:
+            if paths.repo_runtime_hard_disk_image.exists():
+                paths.repo_runtime_hard_disk_image.unlink()
+            status = fetch_release_images(paths)
+            if status != 0:
+                return status
+            if paths.repo_runtime_hard_disk_image.exists():
+                paths.repo_runtime_hard_disk_image.unlink()
+            status = verify_repo_runtime(paths)
+            if status == 0:
+                print("Release readback verification passed.")
+            return status
+        finally:
+            restore_file(paths.repo_boot_image, repo_boot_backup)
+            restore_file(paths.repo_hard_disk_image_archive, repo_disk_backup)
+            restore_file(paths.repo_manifest, repo_manifest_backup)
+            if paths.repo_runtime_hard_disk_image.exists():
+                paths.repo_runtime_hard_disk_image.unlink()
+
+
 def build_and_run_repo_images(paths: BuildPaths, mode: str = "run") -> int:
     if run_build(paths) != 0:
         return 1
@@ -504,10 +605,16 @@ def main(argv: list[str] | None = None) -> int:
         return run_bootstrap_host(paths)
     if args.command == "build":
         return run_build(paths)
+    if args.command == "verify-repo-images":
+        return verify_repo_runtime(paths)
     if args.command == "check-repo-images":
         return check_repo_images(paths)
+    if args.command == "check-reproducible-build":
+        return check_reproducible_build(paths)
     if args.command == "fetch-release-images":
         return fetch_release_images(paths)
+    if args.command == "verify-release-readback":
+        return verify_release_readback(paths)
     if args.command == "prepare-release-assets":
         return prepare_release_assets(
             paths,

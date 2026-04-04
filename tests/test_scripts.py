@@ -100,6 +100,18 @@ class ScriptTest(unittest.TestCase):
         self.assertIn("rebuild/driver.py", text)
         self.assertIn("fetch-release-images", text)
 
+    def test_check_reproducible_build_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "check-reproducible-build.sh").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("check-reproducible-build", text)
+
+    def test_verify_release_readback_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "verify-release-readback.sh").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("verify-release-readback", text)
+
     def test_build_and_run_window_script_calls_python_driver(self) -> None:
         text = (ROOT / "scripts" / "build-and-run-window.sh").read_text()
 
@@ -123,6 +135,18 @@ class ScriptTest(unittest.TestCase):
 
         self.assertIn("rebuild/driver.py", text)
         self.assertIn("fetch-release-images", text)
+
+    def test_windows_check_reproducible_build_powershell_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "check-reproducible-build.ps1").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("check-reproducible-build", text)
+
+    def test_windows_verify_release_readback_powershell_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "verify-release-readback.ps1").read_text()
+
+        self.assertIn("rebuild/driver.py", text)
+        self.assertIn("verify-release-readback", text)
 
     def test_windows_build_and_run_window_powershell_script_calls_python_driver(self) -> None:
         text = (ROOT / "scripts" / "build-and-run-window.ps1").read_text()
@@ -153,6 +177,18 @@ class ScriptTest(unittest.TestCase):
 
         self.assertIn("powershell", text.lower())
         self.assertIn("fetch-release-images.ps1", text)
+
+    def test_windows_check_reproducible_build_batch_script_delegates_to_powershell(self) -> None:
+        text = (ROOT / "scripts" / "check-reproducible-build.cmd").read_text()
+
+        self.assertIn("powershell", text.lower())
+        self.assertIn("check-reproducible-build.ps1", text)
+
+    def test_windows_verify_release_readback_batch_script_delegates_to_powershell(self) -> None:
+        text = (ROOT / "scripts" / "verify-release-readback.cmd").read_text()
+
+        self.assertIn("powershell", text.lower())
+        self.assertIn("verify-release-readback.ps1", text)
 
     def test_driver_supports_dry_run(self) -> None:
         result = subprocess.run(

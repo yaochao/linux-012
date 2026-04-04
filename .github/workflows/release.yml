@@ -97,3 +97,6 @@ jobs:
             images/hdc-0.12.img.xz \
             images/manifest.json \
             --clobber
+
+      - name: Verify release readback against published assets
+        run: python3 rebuild/driver.py verify-release-readback

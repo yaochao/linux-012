@@ -3,9 +3,11 @@ import json
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 from rebuild.driver import (
     BuildPaths,
+    check_reproducible_build,
     check_repo_images,
     docker_build_command,
     docker_run_command,
@@ -14,6 +16,8 @@ from rebuild.driver import (
     parse_args,
     prepare_release_assets,
     sync_repo_images,
+    verify_release_readback,
+    verify_repo_runtime,
     verify_environment,
 )
 
@@ -60,8 +64,11 @@ class RebuildDriverTest(unittest.TestCase):
             "run",
             "verify",
             "verify-userland",
+            "verify-repo-images",
             "check-repo-images",
+            "check-reproducible-build",
             "fetch-release-images",
+            "verify-release-readback",
             "prepare-release-assets",
             "run-repo-images",
             "build-and-run-repo-images",
@@ -102,6 +109,23 @@ class RebuildDriverTest(unittest.TestCase):
 
         self.assertEqual(str(paths.repo_boot_image), env["LINUX012_BOOT_SOURCE_IMAGE"])
         self.assertEqual(str(paths.repo_runtime_hard_disk_image), env["LINUX012_HARD_DISK_IMAGE"])
+
+    def test_verify_repo_runtime_uses_repo_images_for_verify_mode(self) -> None:
+        root = pathlib.Path("/tmp/linux-012")
+        paths = BuildPaths.from_root(root)
+        calls: list[tuple[list[str], dict[str, str]]] = []
+
+        def fake_run(command: list[str], *, cwd: pathlib.Path, env=None) -> int:
+            calls.append((command, env or {}))
+            return 0
+
+        with mock.patch("rebuild.driver.ensure_repo_runtime_images", return_value=0):
+            with mock.patch("rebuild.driver.run_command", side_effect=fake_run):
+                self.assertEqual(0, verify_repo_runtime(paths))
+
+        self.assertEqual("verify", calls[0][0][-1])
+        self.assertEqual(str(paths.repo_boot_image), calls[0][1]["LINUX012_BOOT_SOURCE_IMAGE"])
+        self.assertEqual(str(paths.repo_runtime_hard_disk_image), calls[0][1]["LINUX012_HARD_DISK_IMAGE"])
 
     def test_sync_repo_images_compresses_repo_hard_disk_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -208,6 +232,64 @@ class RebuildDriverTest(unittest.TestCase):
             self.assertEqual(0, fetch_release_images(paths))
             self.assertEqual(boot, paths.repo_boot_image.read_bytes())
             self.assertEqual(disk, paths.repo_hard_disk_image_archive.read_bytes())
+
+    def test_check_reproducible_build_succeeds_when_two_builds_match(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            paths = BuildPaths.from_root(root)
+            paths.images_dir.mkdir(parents=True)
+            payload = b"disk-image" * 1024
+
+            def fake_run_build(build_paths: BuildPaths) -> int:
+                build_paths.boot_image.write_bytes(b"boot")
+                build_paths.hard_disk_image.write_bytes(payload)
+                return 0
+
+            with mock.patch("rebuild.driver.run_build", side_effect=fake_run_build):
+                self.assertEqual(0, check_reproducible_build(paths))
+
+    def test_verify_release_readback_restores_original_repo_snapshots_after_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            release_dir = root / "release"
+            release_dir.mkdir()
+            original_boot = b"boot-original"
+            original_disk = b"disk-original"
+            release_boot = b"boot-release"
+            release_disk = b"disk-release"
+            (release_dir / "bootimage-0.12-hd").write_bytes(release_boot)
+            (release_dir / "hdc-0.12.img.xz").write_bytes(release_disk)
+            paths = BuildPaths.from_root(root)
+            paths.repo_images_dir.mkdir(parents=True)
+            paths.repo_boot_image.write_bytes(original_boot)
+            paths.repo_hard_disk_image_archive.write_bytes(original_disk)
+            paths.repo_manifest.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "release_tag": "v9.9.9",
+                        "download_base_url": release_dir.as_uri(),
+                        "assets": {
+                            "bootimage-0.12-hd": {
+                                "sha256": hashlib.sha256(release_boot).hexdigest(),
+                                "size": len(release_boot),
+                            },
+                            "hdc-0.12.img.xz": {
+                                "sha256": hashlib.sha256(release_disk).hexdigest(),
+                                "size": len(release_disk),
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch("rebuild.driver.verify_repo_runtime", return_value=0) as verify_repo:
+                self.assertEqual(0, verify_release_readback(paths))
+
+            verify_repo.assert_called_once()
+            self.assertEqual(original_boot, paths.repo_boot_image.read_bytes())
+            self.assertEqual(original_disk, paths.repo_hard_disk_image_archive.read_bytes())
 
     def test_prepare_release_assets_writes_manifest_for_requested_tag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -20,3 +20,4 @@ This directory stores the repo-managed runtime image snapshots. They are not thi
 - `scripts/build-and-run.*` and `scripts/build-and-run-window.*` rebuild first, then refresh the snapshots here
 - `scripts/check-images.*` verifies the snapshots here against `manifest.json`
 - `scripts/fetch-release-images.*` restores the snapshots here from the GitHub Release referenced by `manifest.json`
+- `scripts/verify-release-readback.*` deletes the local snapshots, reads them back from the release declared in `manifest.json`, and verifies that they still boot

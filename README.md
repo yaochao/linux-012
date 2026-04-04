@@ -2,6 +2,7 @@
 
 [English README](./README.en.md)
 [变更日志](./CHANGELOG.md)
+[第三方来源与许可](./THIRD_PARTY.md)
 
 这个仓库的目标很直接：在现代宿主机上，从源码和仓库内清单出发，构建出 Linux 0.12 运行所需的两张 QEMU 镜像，启动进入 shell，并成功执行 `ls`。
 
@@ -34,7 +35,9 @@
 
 当前正式发布版本：`v1.0.1`
 
-仓库还带有自动发布资产的 GitHub Actions 工作流：推送 `v*` tag，或者手动触发 `.github/workflows/release.yml`，都会从源码重建镜像、执行一次真实启动验证，并把 `bootimage-0.12-hd`、`hdc-0.12.img.xz`、`manifest.json` 上传到对应的 GitHub Release。手动触发时还可以额外指定 `source_ref`，用于从当前 `main` 或其他 ref 重新发布某个已有 release 的资产。
+根目录 [LICENSE](./LICENSE) 只覆盖仓库自行编写的脚本、补丁、用户态源码、测试和文档。随仓库保留的上游 Linux 0.12 源码归档，以及由它参与生成的镜像产物，边界说明见 [THIRD_PARTY.md](./THIRD_PARTY.md)。
+
+仓库还带有自动发布资产的 GitHub Actions 工作流：推送 `v*` tag，或者手动触发 `.github/workflows/release.yml`，都会从源码重建镜像、执行一次真实启动验证，并把 `bootimage-0.12-hd`、`hdc-0.12.img.xz`、`manifest.json` 上传到对应的 GitHub Release。上传完成后，工作流还会按 release 链接重新拉回这组资产，再启动一次 QEMU 做回读验证。手动触发时还可以额外指定 `source_ref`，用于从当前 `main` 或其他 ref 重新发布某个已有 release 的资产。
 
 ## 支持的宿主机
 
@@ -95,6 +98,12 @@ Windows CMD：
 
 ```bat
 scripts\bootstrap-host.cmd
+```
+
+如果你在 macOS / Ubuntu 上更喜欢统一的顶层入口，也可以直接运行：
+
+```sh
+make bootstrap-host
 ```
 
 ### 3. 直接启动仓库内置镜像
@@ -281,7 +290,48 @@ Windows CMD：
 scripts\verify-userland.cmd
 ```
 
+如果你还想验证“连续两次源码构建产物完全一致”，可以运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/check-reproducible-build.sh
+```
+
+或者直接使用：
+
+```sh
+make repro-check
+```
+
+如果你想验证 GitHub Release 上发布出去的快照重新拉回后仍然能启动并执行 `ls`，可以运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/verify-release-readback.sh
+```
+
+或者直接使用：
+
+```sh
+make release-readback
+```
+
 ## 常用命令
+
+在 macOS / Ubuntu 上，也可以优先使用顶层 `Makefile`：
+
+```sh
+make help
+make build
+make run
+make verify
+make check-images
+make fetch-release-images
+make repro-check
+make release-readback
+```
 
 直接启动仓库内置镜像：
 
@@ -299,6 +349,18 @@ python3 rebuild/driver.py check-repo-images
 
 ```sh
 python3 rebuild/driver.py fetch-release-images
+```
+
+连续做两次源码构建并比较 `bootimage-0.12-hd`、`hdc-0.12.img`、`hdc-0.12.img.xz` 的 SHA-256：
+
+```sh
+python3 rebuild/driver.py check-reproducible-build
+```
+
+删除本地快照、按 `images/manifest.json` 从 release 回读，再启动验证：
+
+```sh
+python3 rebuild/driver.py verify-release-readback
 ```
 
 直接弹出可见的 QEMU 窗口：
@@ -321,7 +383,7 @@ python3 rebuild/driver.py build-and-run-repo-images-window
 
 ## 持续集成
 
-仓库现在包含 GitHub Actions 工作流 [ci.yml](/Users/infoxmed-01/ai/workspace/linux-012/.github/workflows/ci.yml)。它会在推送到 `main` 或对 `main` 发起 Pull Request 时执行两类任务：
+仓库现在包含 GitHub Actions 工作流 [ci.yml](/Users/infoxmed-01/ai/workspace/linux-012/.github/workflows/ci.yml)。它会在推送到 `main` 或对 `main` 发起 Pull Request 时执行四类任务：
 
 - `ubuntu-22.04` 完整链路：
   `python3 -m unittest discover -s tests -v`
@@ -341,8 +403,11 @@ python3 rebuild/driver.py build-and-run-repo-images-window
   基于仓库快照自动解包系统镜像
   `python3 tools/qemu_driver.py verify --dry-run`
   `python3 tools/qemu_driver.py run-window --dry-run`
+- `ubuntu-22.04` 可复现性检查：
+  `python3 -m unittest discover -s tests -v`
+  `python3 rebuild/driver.py check-reproducible-build`
 
-失败时会上传 Ubuntu 的 `out/verify`、`rebuild/out/logs`，以及 Windows 和 macOS 的 `out/repo-images` 作为排查产物。
+失败时会上传 Ubuntu 启动验证产物 `out/verify`、`rebuild/out/logs`，可复现性检查产物 `rebuild/out/images`、`rebuild/out/logs`，以及 Windows 和 macOS 的 `out/repo-images` 作为排查产物。
 
 显式构建镜像：
 
@@ -443,6 +508,8 @@ python3 rebuild/driver.py run
 - 启动镜像本身不足 1.44MB，驱动会在启动前补齐成标准软盘镜像
 - `scripts/check-images.*` 会按 `images/manifest.json` 校验仓库快照
 - `scripts/fetch-release-images.*` 会从 `images/manifest.json` 指向的 GitHub Release 重新拉取仓库快照
+- `scripts/check-reproducible-build.*` 会连续构建两次并比较镜像摘要，验证构建可复现性
+- `scripts/verify-release-readback.*` 会从 release 回读当前快照，再启动 QEMU 验证
 - `scripts/run.*` 默认直接使用仓库里的 `images/` 快照，并在 `out/repo-images/` 里自动解包系统镜像
 - `scripts/run-window.*` 默认直接使用仓库里的 `images/` 快照，并在 `out/repo-images/` 里自动解包系统镜像后弹出可见的 QEMU 窗口
 - `scripts/build-and-run.*` 会重编源码并刷新 `images/`
@@ -472,3 +539,4 @@ python3 rebuild/driver.py run
 
 - `vendor/src/linux-0.12.tar.gz` 来自 kernel.org 的 Linux 0.12 历史源码归档
 - 运行镜像不来自第三方下载，而是由仓库内源码、补丁和清单在本地构建生成
+- 许可边界、第三方来源和生成产物注意事项见 [THIRD_PARTY.md](./THIRD_PARTY.md)

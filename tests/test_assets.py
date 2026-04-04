@@ -38,6 +38,17 @@ class AssetTest(unittest.TestCase):
             self.assertTrue(asset.exists(), asset)
             self.assertGreater(asset.stat().st_size, 0, asset)
 
+    def test_license_and_provenance_docs_exist_and_are_non_empty(self) -> None:
+        assets = [
+            ROOT / "LICENSE",
+            ROOT / "THIRD_PARTY.md",
+            ROOT / "THIRD_PARTY.en.md",
+        ]
+
+        for asset in assets:
+            self.assertTrue(asset.exists(), asset)
+            self.assertGreater(asset.stat().st_size, 0, asset)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -119,3 +119,26 @@ jobs:
           name: linux-012-macos-ci-artifacts
           path: |
             out/repo-images
+
+  linux-012-reproducibility:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Build twice and compare image digests
+        run: python3 rebuild/driver.py check-reproducible-build
+
+      - name: Upload reproducibility artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-012-reproducibility-artifacts
+          path: |
+            rebuild/out/images
+            rebuild/out/logs

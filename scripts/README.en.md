@@ -20,6 +20,10 @@ This directory stores host-facing one-command entry scripts. Each platform has i
   verify the repo-managed snapshots against the committed manifest
 - `fetch-release-images.*`
   restore the repo-managed snapshots from the GitHub Release
+- `check-reproducible-build.*`
+  run two complete builds and compare image digests to verify reproducibility
+- `verify-release-readback.*`
+  read the current snapshots back from the GitHub Release and boot-verify them again
 - `verify.*`
   boot automatically and verify `ls`
 - `verify-userland.*`

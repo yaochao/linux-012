@@ -4,6 +4,8 @@
 
 `vendor/` stores third-party source inputs only. It does not store third-party runtime images. At the moment this directory mainly holds the upstream Linux 0.12 source archive used by the `rebuild/` pipeline.
 
+Material kept here is not relicensed by the root `LICENSE`. The repository-level boundary is documented in [THIRD_PARTY.en.md](../THIRD_PARTY.en.md).
+
 ## Main Contents
 
 - `src/`

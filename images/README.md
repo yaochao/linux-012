@@ -20,3 +20,4 @@
 - `scripts/build-and-run.*` 和 `scripts/build-and-run-window.*` 会先重编，再刷新这里的镜像快照
 - `scripts/check-images.*` 会校验这里的快照是否与 `manifest.json` 一致
 - `scripts/fetch-release-images.*` 会按 `manifest.json` 从 GitHub Release 恢复这里的快照
+- `scripts/verify-release-readback.*` 会删除当前本地快照、按 `manifest.json` 回读发布资产，再验证它们仍可启动

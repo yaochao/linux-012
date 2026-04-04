@@ -20,6 +20,10 @@
   校验仓库镜像快照和清单
 - `fetch-release-images.*`
   从 GitHub Release 恢复仓库镜像快照
+- `check-reproducible-build.*`
+  连续构建两次并比较镜像摘要，检查构建可复现性
+- `verify-release-readback.*`
+  从 GitHub Release 回读当前快照并再次启动验证
 - `verify.*`
   自动启动并验证 `ls`
 - `verify-userland.*`
