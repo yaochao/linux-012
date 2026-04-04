@@ -4,7 +4,12 @@
 
 这个仓库的目标很直接：在现代宿主机上，从源码和仓库内清单出发，构建出 Linux 0.12 运行所需的两张 QEMU 镜像，启动进入 shell，并成功执行 `ls`。
 
-仓库当前不再保存第三方运行时镜像。实际运行所需的镜像都由 `rebuild/` 工作流在本地生成：
+仓库当前不再保存第三方运行时镜像。仓库里提交的是本项目自己编译出来的镜像快照：
+
+- `images/bootimage-0.12-hd`
+- `images/hdc-0.12.img`
+
+同一套源码构建链还会在本地生成工作镜像：
 
 - `rebuild/out/images/bootimage-0.12-hd`
 - `rebuild/out/images/hdc-0.12.img`
@@ -18,6 +23,7 @@
 - 编译内核启动镜像
 - 编译仓库自带的最小用户态程序 `/bin/sh` 和 `/bin/ls`
 - 按仓库清单生成 Minix v1 根文件系统
+- 生成仓库内置镜像 `images/bootimage-0.12-hd` 和 `images/hdc-0.12.img`
 - 启动 QEMU
 - 进入 `[/usr/root]#`
 - 执行 `ls`
@@ -85,7 +91,99 @@ Windows CMD：
 scripts\bootstrap-host.cmd
 ```
 
-### 3. 一键验证
+### 3. 直接启动仓库内置镜像
+
+如果你只是想立即启动 Linux 0.12，直接运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/run.sh
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\run.ps1
+```
+
+Windows CMD：
+
+```bat
+scripts\run.cmd
+```
+
+这条入口直接使用仓库里的 `images/` 镜像，不会先重编源码。macOS / Ubuntu 下它保留当前的终端交互方式；Windows 下本来就是图形窗口。
+
+### 4. 弹出可见的 QEMU 窗口并手动操作
+
+如果你要在这台机器上看到独立的 QEMU 窗口，并自己进去操作 Linux 0.12，运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/run-window.sh
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\run-window.ps1
+```
+
+Windows CMD：
+
+```bat
+scripts\run-window.cmd
+```
+
+在这台 macOS 主机上，这条入口会显式使用 QEMU 的 `cocoa` 显示后端，弹出可见窗口。
+
+### 5. 从编译阶段开始，再启动 QEMU
+
+如果你要从源码编译开始跑完整流程，运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/build-and-run.sh
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\build-and-run.ps1
+```
+
+Windows CMD：
+
+```bat
+scripts\build-and-run.cmd
+```
+
+这条入口会强制重新编译，完成后把新的镜像同步到 `images/`，然后启动 QEMU。
+
+如果你既要“从编译开始”，又要最后看到可交互的 QEMU 窗口，运行：
+
+macOS / Ubuntu：
+
+```sh
+./scripts/build-and-run-window.sh
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\build-and-run-window.ps1
+```
+
+Windows CMD：
+
+```bat
+scripts\build-and-run-window.cmd
+```
+
+### 6. 一键验证
 
 推荐直接运行验证入口。缺少运行镜像时，它会自动触发源码构建。
 
@@ -115,27 +213,51 @@ README
 [/usr/root]#
 ```
 
-### 4. 交互启动
+如果你还想把当前最小 shell 内建命令也做一轮实机验证，可以运行：
 
 macOS / Ubuntu：
 
 ```sh
-./scripts/run.sh
+./scripts/verify-userland.sh
 ```
 
 Windows PowerShell：
 
 ```powershell
-.\scripts\run.ps1
+.\scripts\verify-userland.ps1
 ```
 
 Windows CMD：
 
 ```bat
-scripts\run.cmd
+scripts\verify-userland.cmd
 ```
 
 ## 常用命令
+
+直接启动仓库内置镜像：
+
+```sh
+python3 rebuild/driver.py run-repo-images
+```
+
+直接弹出可见的 QEMU 窗口：
+
+```sh
+python3 rebuild/driver.py run-repo-images-window
+```
+
+强制从源码重编、同步 `images/`，再启动：
+
+```sh
+python3 rebuild/driver.py build-and-run-repo-images
+```
+
+强制从源码重编、同步 `images/`，再弹出可见窗口：
+
+```sh
+python3 rebuild/driver.py build-and-run-repo-images-window
+```
 
 显式构建镜像：
 
@@ -149,6 +271,12 @@ python3 rebuild/driver.py build
 python3 rebuild/driver.py verify
 ```
 
+验证 `pwd`、`echo`、`cat`、`uname` 和 `cd` 这些当前 shell 内建命令：
+
+```sh
+python3 rebuild/driver.py verify-userland
+```
+
 用源码构建出来的镜像交互启动：
 
 ```sh
@@ -159,7 +287,10 @@ python3 rebuild/driver.py run
 
 - `rebuild/out/images/bootimage-0.12-hd`
 - `rebuild/out/images/hdc-0.12.img`
+- `images/bootimage-0.12-hd`
+- `images/hdc-0.12.img`
 - `out/verify/screen.txt`
+- `out/verify-userland/screen.txt`
 - `out/run/boot.img`
 
 ## 这套构建链路做了什么
@@ -174,14 +305,31 @@ python3 rebuild/driver.py run
 6. 根据 `rebuild/rootfs/manifest/` 创建目录、设备节点和启动脚本
 7. 生成 Linux 0.12 可挂载的 Minix v1 根文件系统
 8. 组装成 `hdc-0.12.img`
-9. 启动 QEMU，抓取 VGA 文本，并自动向 guest 发送按键完成验证
+9. 按需把新镜像同步到仓库的 `images/`
+10. 启动 QEMU，抓取 VGA 文本，并自动向 guest 发送按键完成验证
 
 这条链路当前只实现“最小可运行系统”，不尝试复刻一个完整的历史 Linux 0.12 发行版。
+
+当前 shell 内建提供这些命令：
+
+- `cd`
+- `pwd`
+- `echo`
+- `cat`
+- `uname`
+- `exit`
+
+独立用户态二进制当前提供：
+
+- `/bin/sh`
+- `/bin/ls`
 
 ## 仓库结构
 
 - `scripts/`
   不同宿主机的入口脚本
+- `images/`
+  提交到仓库中的自编译运行镜像快照
 - `rebuild/driver.py`
   源码构建、运行和验证入口
 - `rebuild/container/build_images.sh`
@@ -204,6 +352,10 @@ python3 rebuild/driver.py run
 ## 运行说明
 
 - 启动镜像本身不足 1.44MB，驱动会在启动前补齐成标准软盘镜像
+- `scripts/run.*` 默认直接使用仓库里的 `images/`
+- `scripts/run-window.*` 默认直接使用仓库里的 `images/`，并弹出可见的 QEMU 窗口
+- `scripts/build-and-run.*` 会重编源码并刷新 `images/`
+- `scripts/build-and-run-window.*` 会重编源码、刷新 `images/`，然后弹出可见的 QEMU 窗口
 - QEMU 始终以 `-snapshot` 启动，所以重复运行不会改写 `rebuild/out/images/hdc-0.12.img`
 - macOS 和 Ubuntu 22.04 的交互模式使用 `-display curses`
 - Windows 10 的交互模式使用 QEMU 默认图形窗口
@@ -217,6 +369,7 @@ python3 rebuild/driver.py run
 - 从源码构建运行镜像
 - 启动到 shell
 - 自动执行 `ls`
+- 自动验证当前最小 shell 内建命令
 
 当前项目明确不做这些事情：
 

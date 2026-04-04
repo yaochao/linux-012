@@ -22,6 +22,7 @@ VGA_BYTES = 4000
 FLOPPY_BYTES = 1474560
 VERIFY_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 1.0
+USERLAND_VERIFY_TIMEOUT_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
@@ -204,6 +205,9 @@ def build_qemu_command(paths: DriverPaths, mode: str, qemu_bin: str) -> list[str
     if mode == "interactive":
         if paths.platform.interactive_display:
             command.extend(["-display", paths.platform.interactive_display])
+    elif mode == "interactive-window":
+        if paths.platform.name == "macos":
+            command.extend(["-display", "cocoa"])
     else:
         if paths.platform.monitor_kind == "unix":
             command.append("-daemonize")
@@ -267,6 +271,33 @@ def verification_succeeded(final_lines: list[str], baseline_prompt: str) -> bool
     if compact[-1] != baseline_prompt:
         return False
     return any(line and line != f"{baseline_prompt} ls" for line in compact[command_index + 1 : -1])
+
+
+def line_equals(lines: list[str], expected: str) -> bool:
+    return any(line.rstrip() == expected for line in lines)
+
+
+def lines_equal_all(lines: list[str], expected: list[str]) -> bool:
+    return all(line_equals(lines, item) for item in expected)
+
+
+def text_to_keys(text: str) -> list[str]:
+    keys: list[str] = []
+    special = {
+        " ": "spc",
+        "/": "slash",
+        "-": "minus",
+        ".": "dot",
+    }
+    for char in text:
+        if "a" <= char <= "z" or "0" <= char <= "9":
+            keys.append(char)
+            continue
+        if char in special:
+            keys.append(special[char])
+            continue
+        raise ValueError(f"Unsupported character for sendkey automation: {char!r}")
+    return keys
 
 
 class HMPClient:
@@ -396,6 +427,10 @@ def send_keys(client: HMPClient, keys: list[str], delay: float = 0.15) -> None:
         time.sleep(delay)
 
 
+def send_command(client: HMPClient, command: str) -> None:
+    send_keys(client, text_to_keys(command) + ["ret"])
+
+
 def snapshot_screen(client: HMPClient, paths: DriverPaths) -> list[str]:
     dump_path = monitor_file_path(paths.vga_dump, paths.root)
     client.command(f"pmemsave {VGA_ADDRESS} {VGA_BYTES} {hmp_string(dump_path)}")
@@ -403,6 +438,27 @@ def snapshot_screen(client: HMPClient, paths: DriverPaths) -> list[str]:
     lines = decode_vga_text_buffer(data)
     paths.screen_text.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return lines
+
+
+def wait_for_screen(
+    client: HMPClient,
+    paths: DriverPaths,
+    *,
+    timeout: float,
+    description: str,
+    predicate,
+) -> list[str]:
+    deadline = time.time() + timeout
+    last_lines: list[str] = []
+    while time.time() < deadline:
+        lines = snapshot_screen(client, paths)
+        last_lines = lines
+        if predicate(lines):
+            return lines
+        time.sleep(POLL_INTERVAL_SECONDS)
+    if last_lines:
+        paths.screen_text.write_text("\n".join(last_lines) + "\n", encoding="utf-8")
+    raise TimeoutError(f"Timed out waiting for {description}")
 
 
 def wait_for_pidfile(pidfile: Path, timeout: float) -> int:
@@ -616,8 +672,69 @@ def automate_verification(paths: DriverPaths, qemu_bin: str) -> int:
     return 0
 
 
-def run_interactive(paths: DriverPaths, qemu_bin: str) -> int:
-    status, _, process = drive_to_shell(paths=paths, qemu_bin=qemu_bin, mode="interactive", send_ls=False)
+def automate_userland_verification(paths: DriverPaths, qemu_bin: str) -> int:
+    status, baseline_prompt, process = drive_to_shell(
+        paths=paths,
+        qemu_bin=qemu_bin,
+        mode="verify",
+        send_ls=False,
+    )
+    if status != 0:
+        return status
+    if baseline_prompt is None or process is None:
+        print("Verification failed: Linux 0.12 reached shell without a stable prompt.", file=sys.stderr)
+        print(f"Artifacts: {paths.out_dir}", file=sys.stderr)
+        return 1
+
+    steps = [
+        ("pwd", ["/usr/root"], baseline_prompt),
+        ("echo hello", ["hello"], baseline_prompt),
+        ("cat /etc/rc", ["cd /usr/root"], baseline_prompt),
+        ("uname", ["Linux 0.12"], baseline_prompt),
+        ("cd /tmp", [], "[/tmp]#"),
+        ("pwd", ["/tmp"], "[/tmp]#"),
+        ("cd /usr/root", [], baseline_prompt),
+        ("pwd", ["/usr/root"], baseline_prompt),
+    ]
+    prompt = baseline_prompt
+    client = HMPClient(paths)
+    try:
+        client.connect(timeout=10.0)
+        for command, outputs, next_prompt in steps:
+            previous_prompt = prompt
+            send_command(client, command)
+            expected_lines = [f"{previous_prompt} {command}", *outputs]
+            wait_for_screen(
+                client,
+                paths,
+                timeout=USERLAND_VERIFY_TIMEOUT_SECONDS,
+                description=f"command `{command}`",
+                predicate=lambda lines, expected_prompt=next_prompt, expected_lines=expected_lines: (
+                    line_equals(lines, expected_prompt) and lines_equal_all(lines, expected_lines)
+                ),
+            )
+            prompt = next_prompt
+        print("Linux 0.12 userland verification succeeded.")
+        print(f"Prompt: {prompt}")
+        print(f"Screen capture: {paths.screen_text}")
+        return 0
+    except Exception as exc:
+        print(f"Verification failed: {exc}", file=sys.stderr)
+        print(f"Artifacts: {paths.out_dir}", file=sys.stderr)
+        return 1
+    finally:
+        client.close()
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5.0)
+
+
+def run_interactive(paths: DriverPaths, qemu_bin: str, launch_mode: str) -> int:
+    status, _, process = drive_to_shell(paths=paths, qemu_bin=qemu_bin, mode=launch_mode, send_ls=False)
     if status != 0 or process is None:
         return status
     try:
@@ -641,7 +758,7 @@ def bootstrap_host(qemu_bin: str, platform: HostPlatform) -> int:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["bootstrap-host", "run", "verify"])
+    parser.add_argument("mode", choices=["bootstrap-host", "run", "run-window", "verify", "verify-userland"])
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--qemu-bin")
     return parser.parse_args(argv)
@@ -653,8 +770,18 @@ def main(argv: list[str] | None = None) -> int:
     qemu_bin = resolve_qemu_binary(args.qemu_bin, platform)
     if args.mode == "bootstrap-host":
         return bootstrap_host(qemu_bin, platform)
-    session = "run" if args.mode == "run" else "verify"
-    mode = "interactive" if args.mode == "run" else "verify"
+    session_map = {
+        "run": "run",
+        "run-window": "run-window",
+        "verify": "verify",
+        "verify-userland": "verify-userland",
+    }
+    session = session_map[args.mode]
+    mode = "verify"
+    if args.mode == "run":
+        mode = "interactive"
+    if args.mode == "run-window":
+        mode = "interactive-window"
     paths = DriverPaths.from_root(repo_root(), session=session, platform=platform)
     command = build_qemu_command(paths=paths, mode=mode, qemu_bin=qemu_bin)
     if args.dry_run:
@@ -665,7 +792,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{platform.qemu_names[0]} not found. Install it with: {platform.install_hint}", file=sys.stderr)
         return 1
     if args.mode == "run":
-        return run_interactive(paths=paths, qemu_bin=qemu_bin)
+        return run_interactive(paths=paths, qemu_bin=qemu_bin, launch_mode="interactive")
+    if args.mode == "run-window":
+        return run_interactive(paths=paths, qemu_bin=qemu_bin, launch_mode="interactive-window")
+    if args.mode == "verify-userland":
+        return automate_userland_verification(paths=paths, qemu_bin=qemu_bin)
     return automate_verification(paths=paths, qemu_bin=qemu_bin)
 
 

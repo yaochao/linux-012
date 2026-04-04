@@ -15,6 +15,16 @@ class AssetTest(unittest.TestCase):
             self.assertTrue(asset.exists(), asset)
             self.assertGreater(asset.stat().st_size, 0, asset)
 
+    def test_repo_runtime_images_exist_and_are_non_empty(self) -> None:
+        assets = [
+            ROOT / "images" / "bootimage-0.12-hd",
+            ROOT / "images" / "hdc-0.12.img",
+        ]
+
+        for asset in assets:
+            self.assertTrue(asset.exists(), asset)
+            self.assertGreater(asset.stat().st_size, 0, asset)
+
     def test_rebuild_rootfs_inputs_exist_and_are_non_empty(self) -> None:
         assets = [
             ROOT / "rebuild" / "rootfs" / "layout.sfdisk",

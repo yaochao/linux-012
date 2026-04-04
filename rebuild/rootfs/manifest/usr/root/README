@@ -1,2 +1,2 @@
 This root filesystem was built from source inside rebuild/.
-Try: ls
+Try: ls, pwd, echo hello, cat /etc/rc, uname

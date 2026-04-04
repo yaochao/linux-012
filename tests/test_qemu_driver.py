@@ -12,6 +12,7 @@ from tools.qemu_driver import (
     find_stable_prompt,
     hmp_string,
     monitor_file_path,
+    parse_args,
     resolve_host_platform,
     resolve_qemu_binary,
     verification_succeeded,
@@ -55,6 +56,17 @@ class QemuDriverTest(unittest.TestCase):
         self.assertIn("16M", command)
         self.assertTrue(any(str(paths.boot_floppy_image) in item for item in command))
         self.assertTrue(any(str(paths.hard_disk_image) in item for item in command))
+
+    def test_build_qemu_command_for_macos_window_mode_uses_cocoa(self) -> None:
+        root = pathlib.Path("/tmp/linux-012")
+        paths = DriverPaths.from_root(root, platform=resolve_host_platform("darwin"))
+
+        command = build_qemu_command(paths=paths, mode="interactive-window", qemu_bin="qemu-system-i386")
+
+        self.assertIn("-display", command)
+        self.assertIn("cocoa", command)
+        self.assertNotIn("curses", command)
+        self.assertNotIn("none", command)
 
     def test_build_qemu_command_for_windows_interactive_mode_uses_visible_window(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
@@ -209,6 +221,18 @@ class QemuDriverTest(unittest.TestCase):
                     result = resolve_qemu_binary(None, platform)
 
         self.assertEqual(str(qemu), result)
+
+    def test_parse_args_supports_verify_userland_mode(self) -> None:
+        args = parse_args(["verify-userland"])
+
+        self.assertEqual("verify-userland", args.mode)
+        self.assertFalse(args.dry_run)
+
+    def test_parse_args_supports_run_window_mode(self) -> None:
+        args = parse_args(["run-window"])
+
+        self.assertEqual("run-window", args.mode)
+        self.assertFalse(args.dry_run)
 
 
 if __name__ == "__main__":

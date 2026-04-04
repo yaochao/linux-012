@@ -2,4 +2,4 @@
 set -eu
 
 cd "${0%/*}/.."
-exec /usr/bin/python3 rebuild/driver.py run "$@"
+exec /usr/bin/python3 rebuild/driver.py run-repo-images "$@"

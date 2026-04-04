@@ -12,6 +12,9 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertEqual(root / "rebuild", paths.rebuild_dir)
         self.assertEqual(root / "rebuild" / "out" / "images" / "bootimage-0.12-hd", paths.boot_image)
         self.assertEqual(root / "rebuild" / "out" / "images" / "hdc-0.12.img", paths.hard_disk_image)
+        self.assertEqual(root / "images", paths.repo_images_dir)
+        self.assertEqual(root / "images" / "bootimage-0.12-hd", paths.repo_boot_image)
+        self.assertEqual(root / "images" / "hdc-0.12.img", paths.repo_hard_disk_image)
 
     def test_docker_run_command_uses_linux_amd64_and_privileged_mode(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
@@ -35,7 +38,17 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertEqual(str(root), command[-1])
 
     def test_parse_args_supports_bootstrap_build_run_verify(self) -> None:
-        for command in ("bootstrap-host", "build", "run", "verify"):
+        for command in (
+            "bootstrap-host",
+            "build",
+            "run",
+            "verify",
+            "verify-userland",
+            "run-repo-images",
+            "build-and-run-repo-images",
+            "run-repo-images-window",
+            "build-and-run-repo-images-window",
+        ):
             self.assertEqual(command, parse_args([command]).command)
 
     def test_verify_environment_points_runtime_at_rebuild_outputs(self) -> None:
@@ -46,6 +59,15 @@ class RebuildDriverTest(unittest.TestCase):
 
         self.assertEqual(str(paths.boot_image), env["LINUX012_BOOT_SOURCE_IMAGE"])
         self.assertEqual(str(paths.hard_disk_image), env["LINUX012_HARD_DISK_IMAGE"])
+
+    def test_repo_environment_points_runtime_at_repo_images(self) -> None:
+        root = pathlib.Path("/tmp/linux-012")
+        paths = BuildPaths.from_root(root)
+
+        env = verify_environment(paths, source="repo")
+
+        self.assertEqual(str(paths.repo_boot_image), env["LINUX012_BOOT_SOURCE_IMAGE"])
+        self.assertEqual(str(paths.repo_hard_disk_image), env["LINUX012_HARD_DISK_IMAGE"])
 
     def test_build_script_references_source_tarball_userland_and_manifest(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]

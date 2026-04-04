@@ -4,7 +4,12 @@
 
 This repository does one specific thing: on a modern host, it builds the two runtime images required to boot Linux 0.12 under QEMU from source and repo-owned manifests, enters the shell, and verifies the result by running `ls`.
 
-The repository no longer stores third-party runtime images. The images used at runtime are built locally by the `rebuild/` workflow:
+The repository no longer stores third-party runtime images. The repository now includes self-built runtime image snapshots under version control:
+
+- `images/bootimage-0.12-hd`
+- `images/hdc-0.12.img`
+
+The same source-build workflow also produces local working images:
 
 - `rebuild/out/images/bootimage-0.12-hd`
 - `rebuild/out/images/hdc-0.12.img`
@@ -18,6 +23,7 @@ The build and runtime flow is:
 - compile the kernel boot image
 - compile the repo-owned minimal userland programs `/bin/sh` and `/bin/ls`
 - build a Minix v1 root filesystem from repo manifests
+- generate the repo-bundled images `images/bootimage-0.12-hd` and `images/hdc-0.12.img`
 - boot QEMU
 - reach `[/usr/root]#`
 - run `ls`
@@ -85,7 +91,99 @@ Windows CMD:
 scripts\bootstrap-host.cmd
 ```
 
-### 3. Verify End-to-End
+### 3. Start QEMU From The Bundled Images
+
+If you just want to boot Linux 0.12 immediately, run:
+
+macOS / Ubuntu:
+
+```sh
+./scripts/run.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\run.ps1
+```
+
+Windows CMD:
+
+```bat
+scripts\run.cmd
+```
+
+This entrypoint uses the committed images in `images/` directly and does not rebuild first. On macOS / Ubuntu it keeps the current terminal-based interactive flow; on Windows it already uses a visible GUI window.
+
+### 4. Open A Visible QEMU Window And Interact Manually
+
+If you want a visible QEMU window that you can click into and operate yourself, run:
+
+macOS / Ubuntu:
+
+```sh
+./scripts/run-window.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\run-window.ps1
+```
+
+Windows CMD:
+
+```bat
+scripts\run-window.cmd
+```
+
+On this macOS host, this entrypoint explicitly uses QEMU's `cocoa` display backend.
+
+### 5. Rebuild From Source, Then Start QEMU
+
+If you want the flow to start from compilation every time, run:
+
+macOS / Ubuntu:
+
+```sh
+./scripts/build-and-run.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\build-and-run.ps1
+```
+
+Windows CMD:
+
+```bat
+scripts\build-and-run.cmd
+```
+
+This entrypoint forces a rebuild, syncs the new images into `images/`, and then starts QEMU.
+
+If you want the flow to start from compilation and still end in a visible interactive QEMU window, run:
+
+macOS / Ubuntu:
+
+```sh
+./scripts/build-and-run-window.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\build-and-run-window.ps1
+```
+
+Windows CMD:
+
+```bat
+scripts\build-and-run-window.cmd
+```
+
+### 6. Verify End-to-End
 
 The recommended entrypoint is the verification script. If the runtime images are missing, it automatically triggers the source build first.
 
@@ -115,27 +213,51 @@ README
 [/usr/root]#
 ```
 
-### 4. Start an Interactive Session
+If you also want a guest-side check of the current minimal shell built-ins, run:
 
 macOS / Ubuntu:
 
 ```sh
-./scripts/run.sh
+./scripts/verify-userland.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-.\scripts\run.ps1
+.\scripts\verify-userland.ps1
 ```
 
 Windows CMD:
 
 ```bat
-scripts\run.cmd
+scripts\verify-userland.cmd
 ```
 
 ## Common Commands
+
+Start QEMU from the committed repo images:
+
+```sh
+python3 rebuild/driver.py run-repo-images
+```
+
+Start QEMU from the committed repo images with a visible window:
+
+```sh
+python3 rebuild/driver.py run-repo-images-window
+```
+
+Force a fresh rebuild, sync `images/`, and then start QEMU:
+
+```sh
+python3 rebuild/driver.py build-and-run-repo-images
+```
+
+Force a fresh rebuild, sync `images/`, and then start QEMU in a visible window:
+
+```sh
+python3 rebuild/driver.py build-and-run-repo-images-window
+```
 
 Build the images explicitly:
 
@@ -149,6 +271,12 @@ Run source-build verification directly:
 python3 rebuild/driver.py verify
 ```
 
+Verify the current shell built-ins `pwd`, `echo`, `cat`, `uname`, and `cd`:
+
+```sh
+python3 rebuild/driver.py verify-userland
+```
+
 Start an interactive session with source-built images:
 
 ```sh
@@ -159,7 +287,10 @@ Important generated artifacts:
 
 - `rebuild/out/images/bootimage-0.12-hd`
 - `rebuild/out/images/hdc-0.12.img`
+- `images/bootimage-0.12-hd`
+- `images/hdc-0.12.img`
 - `out/verify/screen.txt`
+- `out/verify-userland/screen.txt`
 - `out/run/boot.img`
 
 ## What The Build Pipeline Does
@@ -174,14 +305,31 @@ The `rebuild/` directory owns the full source-to-image pipeline:
 6. create directories, device nodes, and boot files from `rebuild/rootfs/manifest/`
 7. build a Minix v1 root filesystem that Linux 0.12 can mount
 8. assemble `hdc-0.12.img`
-9. boot QEMU, scrape VGA text, and inject keys to complete verification
+9. sync new images into the repo-managed `images/` directory when requested
+10. boot QEMU, scrape VGA text, and inject keys to complete verification
 
 This pipeline intentionally builds only the smallest system required by the repo. It does not try to recreate a full historical Linux 0.12 distribution.
+
+The current shell provides these built-in commands:
+
+- `cd`
+- `pwd`
+- `echo`
+- `cat`
+- `uname`
+- `exit`
+
+The current standalone userland binaries are:
+
+- `/bin/sh`
+- `/bin/ls`
 
 ## Repository Layout
 
 - `scripts/`
   host-specific entry scripts
+- `images/`
+  committed snapshots of the self-built runtime images
 - `rebuild/driver.py`
   source build, runtime, and verification entrypoint
 - `rebuild/container/build_images.sh`
@@ -204,6 +352,10 @@ This pipeline intentionally builds only the smallest system required by the repo
 ## Runtime Notes
 
 - The boot image is shorter than 1.44MB, so the driver pads it into a full floppy image before launch
+- `scripts/run.*` uses the committed images in `images/` by default
+- `scripts/run-window.*` uses the committed images in `images/` and opens a visible QEMU window
+- `scripts/build-and-run.*` rebuilds from source and refreshes `images/`
+- `scripts/build-and-run-window.*` rebuilds from source, refreshes `images/`, and opens a visible QEMU window
 - QEMU always starts with `-snapshot`, so repeated runs do not mutate `rebuild/out/images/hdc-0.12.img`
 - Interactive mode on macOS and Ubuntu 22.04 uses `-display curses`
 - Interactive mode on Windows 10 uses QEMU's default GUI window
@@ -217,6 +369,7 @@ This project does:
 - build runtime images from source
 - boot Linux 0.12 to a shell
 - run `ls` automatically
+- verify the current minimal shell built-ins automatically
 
 This project does not try to:
 

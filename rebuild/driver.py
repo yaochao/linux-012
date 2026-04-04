@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ CONTAINER_IMAGE = "linux-012-rebuild"
 @dataclass(frozen=True)
 class BuildPaths:
     root: Path
+    repo_images_dir: Path
     rebuild_dir: Path
     out_dir: Path
     images_dir: Path
@@ -21,14 +23,18 @@ class BuildPaths:
     work_dir: Path
     boot_image: Path
     hard_disk_image: Path
+    repo_boot_image: Path
+    repo_hard_disk_image: Path
 
     @classmethod
     def from_root(cls, root: Path) -> "BuildPaths":
         rebuild_dir = root / "rebuild"
         out_dir = rebuild_dir / "out"
         images_dir = out_dir / "images"
+        repo_images_dir = root / "images"
         return cls(
             root=root,
+            repo_images_dir=repo_images_dir,
             rebuild_dir=rebuild_dir,
             out_dir=out_dir,
             images_dir=images_dir,
@@ -36,6 +42,8 @@ class BuildPaths:
             work_dir=out_dir / "work",
             boot_image=images_dir / "bootimage-0.12-hd",
             hard_disk_image=images_dir / "hdc-0.12.img",
+            repo_boot_image=repo_images_dir / "bootimage-0.12-hd",
+            repo_hard_disk_image=repo_images_dir / "hdc-0.12.img",
         )
 
 
@@ -75,16 +83,35 @@ def docker_run_command(paths: BuildPaths, script: str) -> list[str]:
     ]
 
 
-def verify_environment(paths: BuildPaths) -> dict[str, str]:
+def verify_environment(paths: BuildPaths, source: str = "rebuild") -> dict[str, str]:
     env = os.environ.copy()
-    env["LINUX012_BOOT_SOURCE_IMAGE"] = str(paths.boot_image)
-    env["LINUX012_HARD_DISK_IMAGE"] = str(paths.hard_disk_image)
-    return env
+    if source == "rebuild":
+        env["LINUX012_BOOT_SOURCE_IMAGE"] = str(paths.boot_image)
+        env["LINUX012_HARD_DISK_IMAGE"] = str(paths.hard_disk_image)
+        return env
+    if source == "repo":
+        env["LINUX012_BOOT_SOURCE_IMAGE"] = str(paths.repo_boot_image)
+        env["LINUX012_HARD_DISK_IMAGE"] = str(paths.repo_hard_disk_image)
+        return env
+    raise ValueError(f"Unsupported runtime image source: {source}")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["bootstrap-host", "build", "run", "verify"])
+    parser.add_argument(
+        "command",
+        choices=[
+            "bootstrap-host",
+            "build",
+            "run",
+            "verify",
+            "verify-userland",
+            "run-repo-images",
+            "run-repo-images-window",
+            "build-and-run-repo-images",
+            "build-and-run-repo-images-window",
+        ],
+    )
     return parser.parse_args(argv)
 
 
@@ -125,6 +152,27 @@ def ensure_rebuilt_images(paths: BuildPaths) -> int:
     return run_build(paths)
 
 
+def require_repo_images(paths: BuildPaths) -> bool:
+    required = [paths.repo_boot_image, paths.repo_hard_disk_image]
+    missing = [path for path in required if not path.exists() or path.stat().st_size == 0]
+    if not missing:
+        return True
+    print("Missing repo-managed runtime images:", file=sys.stderr)
+    for path in missing:
+        print(f"  {path}", file=sys.stderr)
+    print("Run `python3 rebuild/driver.py build-and-run-repo-images` first.", file=sys.stderr)
+    return False
+
+
+def sync_repo_images(paths: BuildPaths) -> int:
+    if not require_rebuilt_images(paths):
+        return 1
+    paths.repo_images_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(paths.boot_image, paths.repo_boot_image)
+    shutil.copy2(paths.hard_disk_image, paths.repo_hard_disk_image)
+    return 0
+
+
 def run_bootstrap_host(paths: BuildPaths) -> int:
     qemu_status = run_command(
         [sys.executable, str(paths.root / "tools" / "qemu_driver.py"), "bootstrap-host"],
@@ -145,6 +193,24 @@ def run_runtime(paths: BuildPaths, mode: str) -> int:
     )
 
 
+def run_repo_runtime(paths: BuildPaths, mode: str = "run") -> int:
+    if not require_repo_images(paths):
+        return 1
+    return run_command(
+        [sys.executable, str(paths.root / "tools" / "qemu_driver.py"), mode],
+        cwd=paths.root,
+        env=verify_environment(paths, source="repo"),
+    )
+
+
+def build_and_run_repo_images(paths: BuildPaths, mode: str = "run") -> int:
+    if run_build(paths) != 0:
+        return 1
+    if sync_repo_images(paths) != 0:
+        return 1
+    return run_repo_runtime(paths, mode=mode)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     paths = BuildPaths.from_root(repo_root())
@@ -154,7 +220,17 @@ def main(argv: list[str] | None = None) -> int:
         return run_build(paths)
     if args.command == "run":
         return run_runtime(paths, mode="run")
-    return run_runtime(paths, mode="verify")
+    if args.command == "verify":
+        return run_runtime(paths, mode="verify")
+    if args.command == "run-repo-images":
+        return run_repo_runtime(paths)
+    if args.command == "run-repo-images-window":
+        return run_repo_runtime(paths, mode="run-window")
+    if args.command == "build-and-run-repo-images":
+        return build_and_run_repo_images(paths)
+    if args.command == "build-and-run-repo-images-window":
+        return build_and_run_repo_images(paths, mode="run-window")
+    return run_runtime(paths, mode="verify-userland")
 
 
 if __name__ == "__main__":

@@ -21,5 +21,5 @@ if ($PythonCommand.Length -gt 1) {
     $PythonArgs = $PythonCommand[1..($PythonCommand.Length - 1)]
 }
 
-& $PythonExe @PythonArgs (Join-Path $Root 'rebuild/driver.py') 'run' @args
+& $PythonExe @PythonArgs (Join-Path $Root 'rebuild/driver.py') 'run-repo-images' @args
 exit $LASTEXITCODE
