@@ -33,7 +33,7 @@ The build and runtime flow is:
 
 This is not a “download a historical image and boot it” repo. It is a “rebuild the runtime images locally and boot them” repo.
 
-Current formal release: `v1.0.1`
+Current formal release: `v1.0.2`
 
 The root [LICENSE](./LICENSE) covers repo-authored scripts, patches, userland sources, tests, and documentation only. The bundled upstream Linux 0.12 source archive and the generated runtime artifacts have their own upstream-related licensing boundary, documented in [THIRD_PARTY.en.md](./THIRD_PARTY.en.md).
 

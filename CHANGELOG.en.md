@@ -2,6 +2,21 @@
 
 [中文变更日志](./CHANGELOG.md)
 
+## v1.0.2
+
+Release date: 2026-04-04
+
+This is the maintenance release after `v1.0.1`, focused on finishing the “stable for long-term use” hardening work.
+
+### Fixes In This Release
+
+- added a reproducibility check that runs two full source builds and compares the digests of `bootimage-0.12-hd`, `hdc-0.12.img`, and `hdc-0.12.img.xz`
+- added release readback verification so published assets are downloaded back from GitHub Release and boot-verified again after upload
+- added a top-level `Makefile` that unifies common entrypoints such as `build`, `run`, `verify`, `check-images`, `repro-check`, and `release-readback`
+- added `LICENSE`, `THIRD_PARTY.md`, and `THIRD_PARTY.en.md` to document the licensing boundary between repo-authored code, third-party source inputs, and generated images
+- GitHub Actions CI now runs the reproducibility job in addition to the Ubuntu, macOS, and Windows checks
+- the READMEs, script directory docs, workflow docs, and `images/manifest.json` are now aligned with the current release process
+
 ## v1.0.1
 
 Release date: 2026-04-04

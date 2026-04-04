@@ -2,6 +2,21 @@
 
 [English CHANGELOG](./CHANGELOG.en.md)
 
+## v1.0.2
+
+发布日期：2026-04-04
+
+这是 `v1.0.1` 之后的维护发布，重点是把“长期稳定可用”这部分工程化补齐。
+
+### 本次修复
+
+- 新增构建可复现性检查：连续两次源码构建会比较 `bootimage-0.12-hd`、`hdc-0.12.img`、`hdc-0.12.img.xz` 的摘要
+- 新增 release 回读验证：发布资产上传到 GitHub Release 后，会重新下载并再次启动验证
+- 新增顶层 `Makefile`，统一 `build`、`run`、`verify`、`check-images`、`repro-check`、`release-readback` 等常用入口
+- 新增 `LICENSE`、`THIRD_PARTY.md`、`THIRD_PARTY.en.md`，明确仓库自有代码与第三方源码输入、生成镜像之间的许可边界
+- GitHub Actions CI 现在除了 Ubuntu / macOS / Windows 三平台校验外，还会自动执行可复现性 job
+- README、脚本目录说明、工作流说明和 `images/manifest.json` 已与当前发布流程对齐
+
 ## v1.0.1
 
 发布日期：2026-04-04
