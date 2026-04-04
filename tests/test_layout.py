@@ -9,6 +9,14 @@ class LayoutTest(unittest.TestCase):
     def test_expected_paths_exist(self) -> None:
         expected = [
             ROOT / "README.md",
+            ROOT / "rebuild" / "README.md",
+            ROOT / "rebuild" / "Dockerfile",
+            ROOT / "rebuild" / "driver.py",
+            ROOT / "rebuild" / "container" / "build_images.sh",
+            ROOT / "rebuild" / "container" / "capture_rootfs.sh",
+            ROOT / "rebuild" / "patches" / "linux-0.12",
+            ROOT / "rebuild" / "rootfs",
+            ROOT / "rebuild" / "out",
             ROOT / "scripts" / "bootstrap-host.sh",
             ROOT / "scripts" / "run.sh",
             ROOT / "scripts" / "verify.sh",
