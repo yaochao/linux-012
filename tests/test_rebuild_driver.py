@@ -34,6 +34,14 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertIn(str(paths.rebuild_dir / "Dockerfile"), command)
         self.assertEqual(str(root), command[-1])
 
+    def test_build_script_references_source_tarball_and_patch_directory(self) -> None:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "rebuild" / "container" / "build_images.sh").read_text()
+
+        self.assertIn("vendor/src/linux-0.12.tar.gz", text)
+        self.assertIn("rebuild/patches/linux-0.12", text)
+        self.assertIn("bootimage-0.12-hd", text)
+
 
 if __name__ == "__main__":
     unittest.main()

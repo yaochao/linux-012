@@ -1,0 +1,6723 @@
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/Makefile patch-new/linux-0.12/Makefile
+--- patch-old/linux-0.12/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/Makefile	2026-04-04 13:12:07
+@@ -1,27 +1,33 @@
++OS = Linux
++
++# indicate the Hardware Image file(60MB)
++HDA_IMG = hdc-0.12.img
++
++# indicate the path of the calltree
++CALLTREE=$(shell find tools/ -name "calltree" -perm 755 -type f)
++
++# indicate the path of the bochs
++BOCHS=bochs
++
+ #
+ # if you want the ram-disk device, define this to be the
+ # size in blocks.
+ #
+-RAMDISK = #-DRAMDISK=512
++RAMDISK =  #-DRAMDISK=512
+ 
+-AS86	=as86 -0 -a
+-LD86	=ld86 -0
++# This is a basic Makefile for setting the general configuration
++include Makefile.header
+ 
+-AS	=gas
+-LD	=gld
+-LDFLAGS	=-s -x -M
+-CC	=gcc $(RAMDISK)
+-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer \
+--fcombine-regs -mstring-insns
+-CPP	=cpp -nostdinc -Iinclude
++LDFLAGS	+= -Ttext 0 -e startup_32
++CFLAGS	+= $(RAMDISK) -Iinclude
++CPP	+= -Iinclude
+ 
+ #
+ # ROOT_DEV specifies the default root-device when making the image.
+ # This can be either FLOPPY, /dev/xxxx or empty, in which case the
+ # default of /dev/hd6 is used by 'build'.
+ #
+-ROOT_DEV=/dev/hd6
+-SWAP_DEV=/dev/hd2
++ROOT_DEV= #FLOPPY 
+ 
+ ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
+ DRIVERS =kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
+@@ -29,101 +35,180 @@
+ LIBS	=lib/lib.a
+ 
+ .c.s:
+-	$(CC) $(CFLAGS) \
+-	-nostdinc -Iinclude -S -o $*.s $<
++	@$(CC) $(CFLAGS) -S -o $*.s $<
+ .s.o:
+-	$(AS) -c -o $*.o $<
++	@$(AS)  -o $*.o $<
+ .c.o:
+-	$(CC) $(CFLAGS) \
+-	-nostdinc -Iinclude -c -o $*.o $<
++	@$(CC) $(CFLAGS) -c -o $*.o $<
+ 
+-all:	Image
++all: Image	
+ 
+-Image: boot/bootsect boot/setup tools/system tools/build
+-	tools/build boot/bootsect boot/setup tools/system $(ROOT_DEV) \
+-		$(SWAP_DEV) > Image
+-	sync
++Image: boot/bootsect boot/setup tools/system
++	@cp -f tools/system system.tmp
++	@$(STRIP) system.tmp
++	@$(OBJCOPY) -O binary -R .note -R .comment system.tmp tools/kernel
++	@tools/build.sh boot/bootsect boot/setup tools/kernel Image $(ROOT_DEV)
++	@rm system.tmp
++	@rm tools/kernel
++	@sync
+ 
+ disk: Image
+-	dd bs=8192 if=Image of=/dev/PS0
++	@dd bs=8192 if=Image of=/dev/fd0
+ 
+-tools/build: tools/build.c
+-	$(CC) $(CFLAGS) \
+-	-o tools/build tools/build.c
+-
+ boot/head.o: boot/head.s
++	@make head.o -C boot/
+ 
+ tools/system:	boot/head.o init/main.o \
+ 		$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
+-	$(LD) $(LDFLAGS) boot/head.o init/main.o \
++	@$(LD) $(LDFLAGS) boot/head.o init/main.o \
+ 	$(ARCHIVES) \
+ 	$(DRIVERS) \
+ 	$(MATH) \
+ 	$(LIBS) \
+-	-o tools/system > System.map
++	-o tools/system 
++	@nm tools/system | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > System.map 
+ 
+ kernel/math/math.a:
+-	(cd kernel/math; make)
++	@make -C kernel/math
+ 
+ kernel/blk_drv/blk_drv.a:
+-	(cd kernel/blk_drv; make)
++	@make -C kernel/blk_drv
+ 
+ kernel/chr_drv/chr_drv.a:
+-	(cd kernel/chr_drv; make)
++	@make -C kernel/chr_drv
+ 
+ kernel/kernel.o:
+-	(cd kernel; make)
++	@make -C kernel
+ 
+ mm/mm.o:
+-	(cd mm; make)
++	@make -C mm
+ 
+ fs/fs.o:
+-	(cd fs; make)
++	@make -C fs
+ 
+ lib/lib.a:
+-	(cd lib; make)
++	@make -C lib
+ 
+ boot/setup: boot/setup.s
+-	$(AS86) -o boot/setup.o boot/setup.s
+-	$(LD86) -s -o boot/setup boot/setup.o
++	@make setup -C boot
+ 
+-boot/setup.s:	boot/setup.S include/linux/config.h
+-	$(CPP) -traditional boot/setup.S -o boot/setup.s
++boot/bootsect: boot/bootsect.s
++	@make bootsect -C boot
+ 
+-boot/bootsect.s:	boot/bootsect.S include/linux/config.h
+-	$(CPP) -traditional boot/bootsect.S -o boot/bootsect.s
++tmp.s:	boot/bootsect.s tools/system
++	@(echo -n "SYSSIZE = (";ls -l tools/system | grep system \
++		| cut -c25-31 | tr '\012' ' '; echo "+ 15 ) / 16") > tmp.s
++	@cat boot/bootsect.s >> tmp.s
+ 
+-boot/bootsect:	boot/bootsect.s
+-	$(AS86) -o boot/bootsect.o boot/bootsect.s
+-	$(LD86) -s -o boot/bootsect boot/bootsect.o
+-
+ clean:
+-	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
+-		boot/bootsect.s boot/setup.s
+-	rm -f init/*.o tools/system tools/build boot/*.o
+-	(cd mm;make clean)
+-	(cd fs;make clean)
+-	(cd kernel;make clean)
+-	(cd lib;make clean)
++	@rm -f Image System.map tmp_make core boot/bootsect boot/setup
++	@rm -f tools/bootsect.map tools/setup.map
++	@rm -f init/*.o tools/system boot/*.o typescript* info bochsout.txt
++	@for i in mm fs kernel lib boot; do make clean -C $$i; done 
++info:
++	@make clean
++	@script -q -c "make all"
++	@cat typescript | col -bp | grep -E "warning|Error" > info
++	@cat info
+ 
++distclean: clean
++	@rm -f tag cscope* linux-0.11.* $(CALLTREE)
++	@(find tools/calltree-2.3 -name "*.o" | xargs -i rm -f {})
++	@make clean -C tools/calltree-2.3
++	@make clean -C tools/bochs/bochs-2.3.7
++
+ backup: clean
+-	(cd .. ; tar cf - linux | compress - > backup.Z)
+-	sync
++	@(cd .. ; tar cf - linux | compress16 - > backup.Z)
++	@sync
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in init/*.c;do echo -n "init/";$(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
+-	(cd fs; make dep)
+-	(cd kernel; make dep)
+-	(cd mm; make dep)
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in init/*.c;do echo -n "init/";$(CPP) -M $$i;done) >> tmp_make
++	@cp tmp_make Makefile
++	@for i in fs kernel mm; do make dep -C $$i; done
+ 
++tag: tags
++tags:
++	@ctags -R
++
++cscope:
++	@cscope -Rbkq
++
++start:
++	@qemu-system-i386 -m 16M -boot a -fda Image -hda $(HDA_IMG)
++
++debug:
++	@echo $(OS)
++	@qemu-system-i386 -m 16M -boot a -fda Image -hda $(HDA_IMG) -s -S&
++	@echo "\nLOG: Please run this in another terminal:\n\n gdb tools/system\n"
++
++bochs-debug:
++	@$(BOCHS) -q -f tools/bochs/bochsrc/bochsrc-hd.bxrc	
++
++bochs:
++ifeq ($(BOCHS),)
++	@(cd tools/bochs/bochs-2.3.7; \
++	./configure --enable-plugins --enable-disasm --enable-gdb-stub;\
++	make)
++endif
++
++bochs-clean:
++	@make clean -C tools/bochs/bochs-2.3.7
++
++calltree:
++ifeq ($(CALLTREE),)
++	@make -C tools/calltree-2.3
++endif
++
++calltree-clean:
++	@(find tools/calltree-2.3 -name "*.o" \
++	-o -name "calltree" -type f | xargs -i rm -f {})
++
++cg: callgraph
++callgraph:
++	@calltree -b -np -m init/main.c | tools/tree2dotx > linux-0.11.dot
++	@dot -Tjpg linux-0.11.dot -o linux-0.11.jpg
++
++help:
++	@echo "<<<<This is the basic help info of linux-0.11>>>"
++	@echo ""
++	@echo "Usage:"
++	@echo "     make --generate a kernel floppy Image with a fs on hda1"
++	@echo "     make start -- start the kernel in qemu"
++	@echo "     make debug -- debug the kernel in qemu & gdb at port 1234"
++	@echo "     make disk  -- generate a kernel Image & copy it to floppy"
++	@echo "     make cscope -- genereate the cscope index databases"
++	@echo "     make tags -- generate the tag file"
++	@echo "     make cg -- generate callgraph of the system architecture"
++	@echo "     make clean -- clean the object files"
++	@echo "     make distclean -- only keep the source code files"
++	@echo "     make bochs-debug -- debug the kernel with bochs built-in debugger"
++	@echo ""
++	@echo "Note!:"
++	@echo "     * You need to install the following basic tools:"
++	@echo "          ubuntu|debian, qemu|bochs, ctags, cscope, calltree, graphviz "
++	@echo "          vim-full, build-essential, hex, dd, gcc 4.3.2..."
++	@echo "     * Becarefull to change the compiling options, which will heavily"
++	@echo "     influence the compiling procedure and running result."
++	@echo "     * Bochs's built-in debugger is perfectly used for debugging in real "
++	@echo "          mode. So you'd better compile it with option '--enable-debugger'."
++	@echo ""
++	@echo "Author:"
++	@echo "     * 1991, linus write and release the original linux 0.95(linux 0.11)."
++	@echo "     * 2005, jiong.zhao<gohigh@sh163.net> release a new version "
++	@echo "     which can be used in RedHat 9 along with the book 'Explaining "
++	@echo "     Linux-0.11 Completly', and he build a site http://www.oldlinux.org"
++	@echo "     * 2008, falcon<wuzhangjin@gmail.com> release a new version which can be"
++	@echo "     used in ubuntu|debian 32bit|64bit with gcc 4.3.2, and give some new "
++	@echo "     features for experimenting. such as this help info, boot/bootsect.s and"
++	@echo "     boot/setup.s with AT&T rewritting, porting to gcc 4.3.2 :-)"
++	@echo ""
++	@echo "<<<Be Happy To Play With It :-)>>>"
++
+ ### Dependencies:
+-init/main.o : init/main.c include/unistd.h include/sys/stat.h \
+-  include/sys/types.h include/sys/time.h include/time.h include/sys/times.h \
+-  include/sys/utsname.h include/sys/param.h include/sys/resource.h \
+-  include/utime.h include/linux/tty.h include/termios.h include/linux/sched.h \
+-  include/linux/head.h include/linux/fs.h include/linux/mm.h \
+-  include/linux/kernel.h include/signal.h include/asm/system.h \
+-  include/asm/io.h include/stddef.h include/stdarg.h include/fcntl.h \
+-  include/string.h 
++init/main.o: init/main.c include/unistd.h include/sys/stat.h \
++  include/sys/types.h include/sys/times.h include/sys/utsname.h \
++  include/utime.h include/time.h include/linux/tty.h include/termios.h \
++  include/linux/sched.h include/linux/head.h include/linux/fs.h \
++  include/linux/mm.h include/signal.h include/asm/system.h \
++  include/asm/io.h include/stddef.h include/stdarg.h include/fcntl.h
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/Makefile.header patch-new/linux-0.12/Makefile.header
+--- patch-old/linux-0.12/Makefile.header	1970-01-01 08:00:00
++++ patch-new/linux-0.12/Makefile.header	2026-04-04 13:12:07
+@@ -0,0 +1,28 @@
++UNAME := $(shell uname)
++
++ifeq ($(UNAME), Linux)
++	AS	= as --32
++	LD	= ld
++	LDFLAGS = -m elf_i386
++	CC	= gcc
++	CFLAGS  = -g -m32 -fno-builtin -fno-stack-protector -fomit-frame-pointer -fstrength-reduce #-Wall
++	CPP	= cpp -nostdinc
++	AR	= ar
++	STRIP = strip
++	OBJCOPY = objcopy
++	# we should use -fno-stack-protector with gcc 4.3
++	gcc_version=$(shell ls -l `which gcc` | tr '-' '\n' | tail -1)
++endif
++
++ifeq ($(UNAME), Darwin)
++	AS	= i386-elf-as --32
++	LD	= i386-elf-ld
++	LDFLAGS = -m elf_i386
++	CC	= i386-elf-gcc
++	CFLAGS  = -gdwarf-2 -g3 -m32 -fno-builtin -fno-stack-protector -fomit-frame-pointer -fstrength-reduce #-Wall
++	CPP	= i386-elf-cpp -nostdinc
++	AR	=i386-elf-ar
++	STRIP = i386-elf-strip
++	OBJCOPY = i386-elf-objcopy
++endif
++
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/Makefile patch-new/linux-0.12/boot/Makefile
+--- patch-old/linux-0.12/boot/Makefile	1970-01-01 08:00:00
++++ patch-new/linux-0.12/boot/Makefile	2026-04-04 13:12:07
+@@ -0,0 +1,28 @@
++include ../Makefile.header
++
++LDFLAGS	+= -Ttext 0
++
++all: bootsect setup
++
++bootsect: bootsect.s
++	@$(AS) -o bootsect.o bootsect.s
++	@$(LD) $(LDFLAGS) -o bootsect bootsect.o
++	@cp -f bootsect bootsect.sym 
++	@nm bootsect.sym | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ../tools/bootsect.map
++	@rm -f bootsect.sym 
++	@$(OBJCOPY) -R .pdr -R .comment -R.note -S -O binary bootsect
++
++
++setup: setup.s
++	@$(AS) -o setup.o setup.s
++	@$(LD) $(LDFLAGS) -o setup setup.o
++	@cp -f setup setup.sym 
++	@nm setup.sym | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ../tools/setup.map
++	@rm -f setup.sym
++	@$(OBJCOPY) -R .pdr -R .comment -R.note -S -O binary setup
++
++head.o: head.s
++	@$(AS) -o head.o head.s
++
++clean:
++	@rm -f bootsect bootsect.o setup setup.o head.o
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/bootsect.S patch-new/linux-0.12/boot/bootsect.S
+--- patch-old/linux-0.12/boot/bootsect.S	2026-04-04 13:12:07
++++ patch-new/linux-0.12/boot/bootsect.S	2026-04-04 13:12:07
+@@ -1,383 +1,253 @@
+-!
+-! SYS_SIZE is the number of clicks (16 bytes) to be loaded.
+-! 0x3000 is 0x30000 bytes = 196kB, more than enough for current
+-! versions of linux
+-!
+-#include <linux/config.h>
+-SYSSIZE = DEF_SYSSIZE
+-!
+-!	bootsect.s		(C) 1991 Linus Torvalds
+-!	modified by Drew Eckhardt
+-!
+-! bootsect.s is loaded at 0x7c00 by the bios-startup routines, and moves
+-! iself out of the way to address 0x90000, and jumps there.
+-!
+-! It then loads 'setup' directly after itself (0x90200), and the system
+-! at 0x10000, using BIOS interrupts. 
+-!
+-! NOTE! currently system is at most 8*65536 bytes long. This should be no
+-! problem, even in the future. I want to keep it simple. This 512 kB
+-! kernel size should be enough, especially as this doesn't contain the
+-! buffer cache as in minix
+-!
+-! The loader has been made as simple as possible, and continuos
+-! read errors will result in a unbreakable loop. Reboot by hand. It
+-! loads pretty fast by getting whole sectors at a time whenever possible.
++	.code16
++# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
++#
++# SYS_SIZE is the number of clicks (16 bytes) to be loaded.
++# 0x3000 is 0x30000 bytes = 196kB, more than enough for current
++# versions of linux
++#
++	.equ SYSSIZE, 0x3000
++#
++#	bootsect.s		(C) 1991 Linus Torvalds
++#
++# bootsect.s is loaded at 0x7c00 by the bios-startup routines, and moves
++# iself out of the way to address 0x90000, and jumps there.
++#
++# It then loads 'setup' directly after itself (0x90200), and the system
++# at 0x10000, using BIOS interrupts. 
++#
++# NOTE! currently system is at most 8*65536 bytes long. This should be no
++# problem, even in the future. I want to keep it simple. This 512 kB
++# kernel size should be enough, especially as this doesn't contain the
++# buffer cache as in minix
++#
++# The loader has been made as simple as possible, and continuos
++# read errors will result in a unbreakable loop. Reboot by hand. It
++# loads pretty fast by getting whole sectors at a time whenever possible.
+ 
+-.globl begtext, begdata, begbss, endtext, enddata, endbss
+-.text
+-begtext:
+-.data
+-begdata:
+-.bss
+-begbss:
+-.text
++	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
++	.text
++	begtext:
++	.data
++	begdata:
++	.bss
++	begbss:
++	.text
+ 
+-SETUPLEN = 4				! nr of setup-sectors
+-BOOTSEG  = 0x07c0			! original address of boot-sector
+-INITSEG  = DEF_INITSEG			! we move boot here - out of the way
+-SETUPSEG = DEF_SETUPSEG			! setup starts here
+-SYSSEG   = DEF_SYSSEG			! system loaded at 0x10000 (65536).
+-ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
++	.equ SETUPLEN, 4		# nr of setup-sectors(256*4=1024)
++	.equ BOOTSEG, 0x07c0	# original address of boot-sector
++	.equ INITSEG, 0x9000	# we move boot here - out of the way
++	.equ SETUPSEG, 0x9020	# setup starts here
++	.equ SYSSEG, 0x1000		# system loaded at 0x10000 (65536).
++	.equ ENDSEG, SYSSEG + SYSSIZE	# where to stop loading
+ 
+-! ROOT_DEV & SWAP_DEV are now written by "build".
+-ROOT_DEV = 0
+-SWAP_DEV = 0
++# ROOT_DEV:	0x000 - same type of floppy as boot.
++#		0x301 - first partition on first drive etc
++#
++##和源码不同，源码中是0x306 第2块硬盘的第一个分区
++#
++	.equ ROOT_DEV, 0x301
++    .equ SWAP_DEV, 0x301
++	ljmp $BOOTSEG, $_start #0x07c0:0005
++_start:
++	mov	$BOOTSEG, %ax	#将ds段寄存器设置为0x07C0
++	mov	%ax, %ds
++	mov	$INITSEG, %ax	#将es段寄存器设置为0x9000
++	mov	%ax, %es
++	mov	$256, %cx		#设置移动计数值256字
++	sub	%si, %si		#源地址	ds:si = 0x07C0:0x0000
++	sub	%di, %di		#目标地址 es:si = 0x9000:0x0000
++	rep					#重复执行并递减cx的值
++	movsw				#从内存[si]处移动cx个字到[di]处
++	ljmp $INITSEG, $go	#段间跳转，这里INITSEG指出跳转到的段地址，解释了cs的值为0x9000
++go:	mov	%cs, %ax		#将ds，es，ss都设置成移动后代码所在的段处(0x9000)
++	mov	%ax, %ds
++	mov	%ax, %es
++# put stack at 0x9ff00.
++	mov	%ax, %ss
++	mov	$0xFF00, %sp	# arbitrary value >>512
+ 
+-entry start
+-start:
+-	mov	ax,#BOOTSEG
+-	mov	ds,ax
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	cx,#256
+-	sub	si,si
+-	sub	di,di
+-	rep
+-	movw
+-	jmpi	go,INITSEG
++# load the setup-sectors directly after the bootblock.
++# Note that 'es'(0x9000) is already set up. 
+ 
+-go:	mov	ax,cs		
+-	mov	dx,#0xfef4	! arbitrary value >>512 - disk parm size
+-
+-	mov	ds,ax
+-	mov	es,ax
+-	push	ax
+-
+-	mov	ss,ax		! put stack at 0x9ff00 - 12.
+-	mov	sp,dx
+-/*
+- *	Many BIOS's default disk parameter tables will not 
+- *	recognize multi-sector reads beyond the maximum sector number
+- *	specified in the default diskette parameter tables - this may
+- *	mean 7 sectors in some cases.
+- *
+- *	Since single sector reads are slow and out of the question,
+- *	we must take care of this by creating new parameter tables
+- *	(for the first disk) in RAM.  We will set the maximum sector
+- *	count to 18 - the most we will encounter on an HD 1.44.  
+- *
+- *	High doesn't hurt.  Low does.
+- *
+- *	Segments are as follows: ds=es=ss=cs - INITSEG,
+- *		fs = 0, gs = parameter table segment
+- */
+-
+-
+-	push	#0
+-	pop	fs
+-	mov	bx,#0x78		! fs:bx is parameter table address
+-	seg fs
+-	lgs	si,(bx)			! gs:si is source
+-
+-	mov	di,dx			! es:di is destination
+-	mov	cx,#6			! copy 12 bytes
+-	cld
+-
+-	rep
+-	seg gs
+-	movw
+-
+-	mov	di,dx
+-	movb	4(di),*18		! patch sector count
+-
+-	seg fs
+-	mov	(bx),di
+-	seg fs
+-	mov	2(bx),es
+-
+-	pop	ax
+-	mov	fs,ax
+-	mov	gs,ax
+-	
+-	xor	ah,ah			! reset FDC 
+-	xor	dl,dl
+-	int 	0x13	
+-
+-! load the setup-sectors directly after the bootblock.
+-! Note that 'es' is already set up.
+-
++#
++##ah=0x02 读磁盘扇区到内存	al＝需要独出的扇区数量
++##ch=磁道(柱面)号的低八位   cl＝开始扇区(位0-5),磁道号高2位(位6－7)
++##dh=磁头号					dl=驱动器号(硬盘则7要置位)
++##es:bx ->指向数据缓冲区；如果出错则CF标志置位,ah中是出错码
++#
+ load_setup:
+-	xor	dx, dx			! drive 0, head 0
+-	mov	cx,#0x0002		! sector 2, track 0
+-	mov	bx,#0x0200		! address = 512, in INITSEG
+-	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
+-	int	0x13			! read it
+-	jnc	ok_load_setup		! ok - continue
++	mov	$0x0000, %dx	# drive 0, head 0
++	mov	$0x0002, %cx	# sector 2, track 0
++	mov	$0x0200, %bx	# address = 512, in INITSEG
++	.equ AX, 0x0200+SETUPLEN
++	mov $AX, %ax    	# service 2, nr of sectors
++	int	$0x13			# read it
++	jnc	ok_load_setup	# ok - continue
++	mov	$0x0000, %dx
++	mov	$0x0000, %ax	# reset the diskette
++	int	$0x13
++	jmp	load_setup
+ 
+-	push	ax			! dump error code
+-	call	print_nl
+-	mov	bp, sp
+-	call	print_hex
+-	pop	ax	
+-	
+-	xor	dl, dl			! reset FDC
+-	xor	ah, ah
+-	int	0x13
+-	j	load_setup
+-
+ ok_load_setup:
+ 
+-! Get disk drive parameters, specifically nr of sectors/track
++# Get disk drive parameters, specifically nr of sectors/track
+ 
+-	xor	dl,dl
+-	mov	ah,#0x08		! AH=8 is get drive parameters
+-	int	0x13
+-	xor	ch,ch
+-	seg cs
+-	mov	sectors,cx
+-	mov	ax,#INITSEG
+-	mov	es,ax
++	mov	$0x00, %dl          # floppy
++	mov	$0x0800, %ax		# AH=8 is get drive parameters
++	int	$0x13
++	#mov $0x00, %ch
++    and $0x003f, %cx
++	mov	%cx, %cs:sectors+0	# %cs means sectors is in %cs
++	mov	$INITSEG, %ax       # 0x9000 
++	mov	%ax, %es
+ 
+-! Print some inane message
++# Change: 2020-02-06
++# Clear screen
++    mov $0x0003, %ax
++    int $0x10
+ 
+-	mov	ah,#0x03		! read cursor pos
+-	xor	bh,bh
+-	int	0x10
+-	
+-	mov	cx,#9
+-	mov	bx,#0x0007		! page 0, attribute 7 (normal)
+-	mov	bp,#msg1
+-	mov	ax,#0x1301		! write string, move cursor
+-	int	0x10
++# Print some inane message
+ 
+-! ok, we've written the message, now
+-! we want to load the system (at 0x10000)
++	mov	$0x03, %ah	    	# read cursor pos
++	xor	%bh, %bh
++	int	$0x10               # dh(row 0-24) dl(col 0-79)
++	mov	$32, %cx            # nr of characters
++	mov	$0x000b, %bx		# page 0, attribute b 
++	mov $msg1, %bp
++	mov	$0x1301, %ax		# write string, move cursor
++	int	$0x10
+ 
+-	mov	ax,#SYSSEG
+-	mov	es,ax		! segment of 0x010000
+-	call	read_it
+-	call	kill_motor
+-	call	print_nl
++# ok, we've written the message, now
++# we want to load the system (at 0x10000)
+ 
+-! After that we check which root-device to use. If the device is
+-! defined (!= 0), nothing is done and the given device is used.
+-! Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
+-! on the number of sectors that the BIOS reports currently.
++	mov	$SYSSEG, %ax
++	mov	%ax, %es		# segment of 0x010000
++	call read_it
++	call kill_motor
+ 
+-	seg cs
+-	mov	ax,root_dev
+-	or	ax,ax
+-	jne	root_defined
+-	seg cs
+-	mov	bx,sectors
+-	mov	ax,#0x0208		! /dev/ps0 - 1.2Mb
+-	cmp	bx,#15
++# After that we check which root-device to use. If the device is
++# defined (#= 0), nothing is done and the given device is used.
++# Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
++# on the number of sectors that the BIOS reports currently.
++
++	mov	%cs:root_dev+0, %ax #0x301
++	cmp	$0, %ax
++	jne	root_defined        # ROOT_DEV has defined
++	mov	%cs:sectors+0, %bx
++	mov	$0x0208, %ax		# /dev/ps0 - 1.2Mb
++	cmp	$15, %bx
+ 	je	root_defined
+-	mov	ax,#0x021c		! /dev/PS0 - 1.44Mb
+-	cmp	bx,#18
++	mov	$0x021c, %ax		# /dev/PS0 - 1.44Mb
++	cmp	$18, %bx
+ 	je	root_defined
+ undef_root:
+ 	jmp undef_root
+ root_defined:
+-	seg cs
+-	mov	root_dev,ax
++	mov	%ax, %cs:root_dev+0
+ 
+-! after that (everyting loaded), we jump to
+-! the setup-routine loaded directly after
+-! the bootblock:
++# after that (everyting loaded), we jump to
++# the setup-routine loaded directly after
++# the bootblock:
+ 
+-	jmpi	0,SETUPSEG
++	ljmp	$SETUPSEG, $0
+ 
+-! This routine loads the system at address 0x10000, making sure
+-! no 64kB boundaries are crossed. We try to load it as fast as
+-! possible, loading whole tracks whenever we can.
+-!
+-! in:	es - starting address segment (normally 0x1000)
+-!
+-sread:	.word 1+SETUPLEN	! sectors read of current track
+-head:	.word 0			! current head
+-track:	.word 0			! current track
++# This routine loads the system at address 0x10000, making sure
++# no 64kB boundaries are crossed. We try to load it as fast as
++# possible, loading whole tracks whenever we can.
++#
++# in:	es - starting address segment (normally 0x1000)
++#
++sread:	.word 1+ SETUPLEN	# sectors read of current track
++head:	.word 0			    # current head
++track:	.word 0		    	# current track
+ 
+ read_it:
+-	mov ax,es
+-	test ax,#0x0fff
+-die:	jne die			! es must be at 64kB boundary
+-	xor bx,bx		! bx is starting address within segment
++	mov	%es, %ax
++	test $0x0fff, %ax
++die:
++    jne die			        # es must be at 64kB boundary
++	xor %bx, %bx		    # bx is starting address within segment
+ rp_read:
+-	mov ax,es
+-	cmp ax,#ENDSEG		! have we loaded all yet?
+-	jb ok1_read
++	mov %es, %ax
++ 	cmp $ENDSEG, %ax	    # have we loaded all yet?
++	jb	ok1_read
+ 	ret
+ ok1_read:
+-	seg cs
+-	mov ax,sectors
+-	sub ax,sread
+-	mov cx,ax
+-	shl cx,#9
+-	add cx,bx
++	mov	%cs:sectors+0, %ax
++	sub	sread, %ax
++	mov	%ax, %cx
++	shl	$9, %cx
++	add	%bx, %cx
+ 	jnc ok2_read
+-	je ok2_read
+-	xor ax,ax
+-	sub ax,bx
+-	shr ax,#9
++	je 	ok2_read
++	xor %ax, %ax
++	sub %bx, %ax
++	shr $9, %ax
+ ok2_read:
+ 	call read_track
+-	mov cx,ax
+-	add ax,sread
+-	seg cs
+-	cmp ax,sectors
++	mov %ax, %cx
++	add sread, %ax
++	cmp %cs:sectors+0, %ax
+ 	jne ok3_read
+-	mov ax,#1
+-	sub ax,head
++	mov $1, %ax
++	sub head, %ax
+ 	jne ok4_read
+-	inc track
++	incw track 
+ ok4_read:
+-	mov head,ax
+-	xor ax,ax
++	mov	%ax, head
++	xor	%ax, %ax
+ ok3_read:
+-	mov sread,ax
+-	shl cx,#9
+-	add bx,cx
+-	jnc rp_read
+-	mov ax,es
+-	add ah,#0x10
+-	mov es,ax
+-	xor bx,bx
+-	jmp rp_read
++	mov	%ax, sread
++	shl	$9, %cx
++	add	%cx, %bx
++	jnc	rp_read
++	mov	%es, %ax
++	add	$0x1000, %ax
++	mov	%ax, %es
++	xor	%bx, %bx
++	jmp	rp_read
+ 
+ read_track:
+-	pusha
+-	pusha	
+-	mov	ax, #0xe2e 	! loading... message 2e = .
+-	mov	bx, #7
+- 	int	0x10
+-	popa		
+-
+-	mov dx,track
+-	mov cx,sread
+-	inc cx
+-	mov ch,dl
+-	mov dx,head
+-	mov dh,dl
+-	and dx,#0x0100
+-	mov ah,#2
+-	
+-	push	dx				! save for error dump
+-	push	cx
+-	push	bx
+-	push	ax
+-
+-	int 0x13
+-	jc bad_rt
+-	add	sp, #8   	
+-	popa
++	push %ax
++	push %bx
++	push %cx
++	push %dx
++	mov	track, %dx
++	mov	sread, %cx
++	inc	%cx
++	mov	%dl, %ch
++	mov	head, %dx
++	mov	%dl, %dh
++	mov	$0, %dl
++	and	$0x0100, %dx
++	mov	$2, %ah
++	int	$0x13
++	jc	bad_rt
++	pop	%dx
++	pop	%cx
++	pop	%bx
++	pop	%ax
+ 	ret
++bad_rt:	mov	$0, %ax
++	mov	$0, %dx
++	int	$0x13
++	pop	%dx
++	pop	%cx
++	pop	%bx
++	pop	%ax
++	jmp	read_track
+ 
+-bad_rt:	push	ax				! save error code
+-	call	print_all			! ah = error, al = read
+-	
+-	
+-	xor ah,ah
+-	xor dl,dl
+-	int 0x13
+-	
+-
+-	add	sp, #10
+-	popa	
+-	jmp read_track
+-
+-/*
+- *	print_all is for debugging purposes.  
+- *	It will print out all of the registers.  The assumption is that this is
+- *	called from a routine, with a stack frame like
+- *	dx 
+- *	cx
+- *	bx
+- *	ax
+- *	error
+- *	ret <- sp
+- *
+-*/
+- 
+-print_all:
+-	mov	cx, #5		! error code + 4 registers
+-	mov	bp, sp	
+-
+-print_loop:
+-	push	cx		! save count left
+-	call	print_nl	! nl for readability
+-	jae	no_reg		! see if register name is needed
+-	
+-	mov	ax, #0xe05 + 0x41 - 1
+-	sub	al, cl
+-	int	0x10
+-
+-	mov	al, #0x58 	! X
+-	int	0x10
+-
+-	mov	al, #0x3a 	! :
+-	int	0x10
+-
+-no_reg:
+-	add	bp, #2		! next register
+-	call	print_hex	! print it
+-	pop	cx
+-	loop	print_loop
+-	ret
+-
+-print_nl:
+-	mov	ax, #0xe0d	! CR
+-	int	0x10
+-	mov	al, #0xa	! LF
+-	int 	0x10
+-	ret
+-
+-/*
+- *	print_hex is for debugging purposes, and prints the word
+- *	pointed to by ss:bp in hexadecmial.
+-*/
+-
+-print_hex:
+-	mov	cx, #4		! 4 hex digits
+-	mov	dx, (bp)	! load word into dx
+-print_digit:
+-	rol	dx, #4		! rotate so that lowest 4 bits are used
+-	mov	ah, #0xe	
+-	mov	al, dl		! mask off so we have only next nibble
+-	and	al, #0xf
+-	add	al, #0x30	! convert to 0 based digit, '0'
+-	cmp	al, #0x39	! check for overflow
+-	jbe	good_digit
+-	add	al, #0x41 - 0x30 - 0xa 	! 'A' - '0' - 0xa
+-
+-good_digit:
+-	int	0x10
+-	loop	print_digit
+-	ret
+-
+-
+-/*
+- * This procedure turns off the floppy drive motor, so
+- * that we enter the kernel in a known state, and
+- * don't have to worry about it later.
+- */
++#/*
++# * This procedure turns off the floppy drive motor, so
++# * that we enter the kernel in a known state, and
++# * don't have to worry about it later.
++# */
+ kill_motor:
+-	push dx
+-	mov dx,#0x3f2
+-	xor al, al
+-	outb
+-	pop dx
++	push %dx
++	mov	$0x3f2, %dx
++	mov	$0, %al
++	outsb
++	pop	%dx
+ 	ret
+ 
+ sectors:
+@@ -385,20 +255,20 @@
+ 
+ msg1:
+ 	.byte 13,10
+-	.ascii "Loading"
++	.ascii "linux 0.12 OS is booting ..."
++	.byte 13,10
+ 
+-.org 506
++	.org 506
+ swap_dev:
+-	.word SWAP_DEV
++    .word SWAP_DEV
+ root_dev:
+ 	.word ROOT_DEV
+ boot_flag:
+ 	.word 0xAA55
+-
+-.text
+-endtext:
+-.data
+-enddata:
+-.bss
+-endbss:
+-
++	
++	.text
++	endtext:
++	.data
++	enddata:
++	.bss
++	endbss:
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/bootsect.s patch-new/linux-0.12/boot/bootsect.s
+--- patch-old/linux-0.12/boot/bootsect.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/boot/bootsect.s	2026-04-04 13:12:07
+@@ -1,383 +1,253 @@
+-!
+-! SYS_SIZE is the number of clicks (16 bytes) to be loaded.
+-! 0x3000 is 0x30000 bytes = 196kB, more than enough for current
+-! versions of linux
+-!
+-#include <linux/config.h>
+-SYSSIZE = DEF_SYSSIZE
+-!
+-!	bootsect.s		(C) 1991 Linus Torvalds
+-!	modified by Drew Eckhardt
+-!
+-! bootsect.s is loaded at 0x7c00 by the bios-startup routines, and moves
+-! iself out of the way to address 0x90000, and jumps there.
+-!
+-! It then loads 'setup' directly after itself (0x90200), and the system
+-! at 0x10000, using BIOS interrupts. 
+-!
+-! NOTE! currently system is at most 8*65536 bytes long. This should be no
+-! problem, even in the future. I want to keep it simple. This 512 kB
+-! kernel size should be enough, especially as this doesn't contain the
+-! buffer cache as in minix
+-!
+-! The loader has been made as simple as possible, and continuos
+-! read errors will result in a unbreakable loop. Reboot by hand. It
+-! loads pretty fast by getting whole sectors at a time whenever possible.
++	.code16
++# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
++#
++# SYS_SIZE is the number of clicks (16 bytes) to be loaded.
++# 0x3000 is 0x30000 bytes = 196kB, more than enough for current
++# versions of linux
++#
++	.equ SYSSIZE, 0x3000
++#
++#	bootsect.s		(C) 1991 Linus Torvalds
++#
++# bootsect.s is loaded at 0x7c00 by the bios-startup routines, and moves
++# iself out of the way to address 0x90000, and jumps there.
++#
++# It then loads 'setup' directly after itself (0x90200), and the system
++# at 0x10000, using BIOS interrupts. 
++#
++# NOTE! currently system is at most 8*65536 bytes long. This should be no
++# problem, even in the future. I want to keep it simple. This 512 kB
++# kernel size should be enough, especially as this doesn't contain the
++# buffer cache as in minix
++#
++# The loader has been made as simple as possible, and continuos
++# read errors will result in a unbreakable loop. Reboot by hand. It
++# loads pretty fast by getting whole sectors at a time whenever possible.
+ 
+-.globl begtext, begdata, begbss, endtext, enddata, endbss
+-.text
+-begtext:
+-.data
+-begdata:
+-.bss
+-begbss:
+-.text
++	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
++	.text
++	begtext:
++	.data
++	begdata:
++	.bss
++	begbss:
++	.text
+ 
+-SETUPLEN = 4				! nr of setup-sectors
+-BOOTSEG  = 0x07c0			! original address of boot-sector
+-INITSEG  = DEF_INITSEG			! we move boot here - out of the way
+-SETUPSEG = DEF_SETUPSEG			! setup starts here
+-SYSSEG   = DEF_SYSSEG			! system loaded at 0x10000 (65536).
+-ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
++	.equ SETUPLEN, 4		# nr of setup-sectors(256*4=1024)
++	.equ BOOTSEG, 0x07c0	# original address of boot-sector
++	.equ INITSEG, 0x9000	# we move boot here - out of the way
++	.equ SETUPSEG, 0x9020	# setup starts here
++	.equ SYSSEG, 0x1000		# system loaded at 0x10000 (65536).
++	.equ ENDSEG, SYSSEG + SYSSIZE	# where to stop loading
+ 
+-! ROOT_DEV & SWAP_DEV are now written by "build".
+-ROOT_DEV = 0
+-SWAP_DEV = 0
++# ROOT_DEV:	0x000 - same type of floppy as boot.
++#		0x301 - first partition on first drive etc
++#
++##和源码不同，源码中是0x306 第2块硬盘的第一个分区
++#
++	.equ ROOT_DEV, 0x301
++    .equ SWAP_DEV, 0x301
++	ljmp $BOOTSEG, $_start #0x07c0:0005
++_start:
++	mov	$BOOTSEG, %ax	#将ds段寄存器设置为0x07C0
++	mov	%ax, %ds
++	mov	$INITSEG, %ax	#将es段寄存器设置为0x9000
++	mov	%ax, %es
++	mov	$256, %cx		#设置移动计数值256字
++	sub	%si, %si		#源地址	ds:si = 0x07C0:0x0000
++	sub	%di, %di		#目标地址 es:si = 0x9000:0x0000
++	rep					#重复执行并递减cx的值
++	movsw				#从内存[si]处移动cx个字到[di]处
++	ljmp $INITSEG, $go	#段间跳转，这里INITSEG指出跳转到的段地址，解释了cs的值为0x9000
++go:	mov	%cs, %ax		#将ds，es，ss都设置成移动后代码所在的段处(0x9000)
++	mov	%ax, %ds
++	mov	%ax, %es
++# put stack at 0x9ff00.
++	mov	%ax, %ss
++	mov	$0xFF00, %sp	# arbitrary value >>512
+ 
+-entry start
+-start:
+-	mov	ax,#BOOTSEG
+-	mov	ds,ax
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	cx,#256
+-	sub	si,si
+-	sub	di,di
+-	rep
+-	movw
+-	jmpi	go,INITSEG
++# load the setup-sectors directly after the bootblock.
++# Note that 'es'(0x9000) is already set up. 
+ 
+-go:	mov	ax,cs		
+-	mov	dx,#0xfef4	! arbitrary value >>512 - disk parm size
+-
+-	mov	ds,ax
+-	mov	es,ax
+-	push	ax
+-
+-	mov	ss,ax		! put stack at 0x9ff00 - 12.
+-	mov	sp,dx
+-/*
+- *	Many BIOS's default disk parameter tables will not 
+- *	recognize multi-sector reads beyond the maximum sector number
+- *	specified in the default diskette parameter tables - this may
+- *	mean 7 sectors in some cases.
+- *
+- *	Since single sector reads are slow and out of the question,
+- *	we must take care of this by creating new parameter tables
+- *	(for the first disk) in RAM.  We will set the maximum sector
+- *	count to 18 - the most we will encounter on an HD 1.44.  
+- *
+- *	High doesn't hurt.  Low does.
+- *
+- *	Segments are as follows: ds=es=ss=cs - INITSEG,
+- *		fs = 0, gs = parameter table segment
+- */
+-
+-
+-	push	#0
+-	pop	fs
+-	mov	bx,#0x78		! fs:bx is parameter table address
+-	seg fs
+-	lgs	si,(bx)			! gs:si is source
+-
+-	mov	di,dx			! es:di is destination
+-	mov	cx,#6			! copy 12 bytes
+-	cld
+-
+-	rep
+-	seg gs
+-	movw
+-
+-	mov	di,dx
+-	movb	4(di),*18		! patch sector count
+-
+-	seg fs
+-	mov	(bx),di
+-	seg fs
+-	mov	2(bx),es
+-
+-	pop	ax
+-	mov	fs,ax
+-	mov	gs,ax
+-	
+-	xor	ah,ah			! reset FDC 
+-	xor	dl,dl
+-	int 	0x13	
+-
+-! load the setup-sectors directly after the bootblock.
+-! Note that 'es' is already set up.
+-
++#
++##ah=0x02 读磁盘扇区到内存	al＝需要独出的扇区数量
++##ch=磁道(柱面)号的低八位   cl＝开始扇区(位0-5),磁道号高2位(位6－7)
++##dh=磁头号					dl=驱动器号(硬盘则7要置位)
++##es:bx ->指向数据缓冲区；如果出错则CF标志置位,ah中是出错码
++#
+ load_setup:
+-	xor	dx, dx			! drive 0, head 0
+-	mov	cx,#0x0002		! sector 2, track 0
+-	mov	bx,#0x0200		! address = 512, in INITSEG
+-	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
+-	int	0x13			! read it
+-	jnc	ok_load_setup		! ok - continue
++	mov	$0x0000, %dx	# drive 0, head 0
++	mov	$0x0002, %cx	# sector 2, track 0
++	mov	$0x0200, %bx	# address = 512, in INITSEG
++	.equ AX, 0x0200+SETUPLEN
++	mov $AX, %ax    	# service 2, nr of sectors
++	int	$0x13			# read it
++	jnc	ok_load_setup	# ok - continue
++	mov	$0x0000, %dx
++	mov	$0x0000, %ax	# reset the diskette
++	int	$0x13
++	jmp	load_setup
+ 
+-	push	ax			! dump error code
+-	call	print_nl
+-	mov	bp, sp
+-	call	print_hex
+-	pop	ax	
+-	
+-	xor	dl, dl			! reset FDC
+-	xor	ah, ah
+-	int	0x13
+-	j	load_setup
+-
+ ok_load_setup:
+ 
+-! Get disk drive parameters, specifically nr of sectors/track
++# Get disk drive parameters, specifically nr of sectors/track
+ 
+-	xor	dl,dl
+-	mov	ah,#0x08		! AH=8 is get drive parameters
+-	int	0x13
+-	xor	ch,ch
+-	seg cs
+-	mov	sectors,cx
+-	mov	ax,#INITSEG
+-	mov	es,ax
++	mov	$0x00, %dl          # floppy
++	mov	$0x0800, %ax		# AH=8 is get drive parameters
++	int	$0x13
++	#mov $0x00, %ch
++    and $0x003f, %cx
++	mov	%cx, %cs:sectors+0	# %cs means sectors is in %cs
++	mov	$INITSEG, %ax       # 0x9000 
++	mov	%ax, %es
+ 
+-! Print some inane message
++# Change: 2020-02-06
++# Clear screen
++    mov $0x0003, %ax
++    int $0x10
+ 
+-	mov	ah,#0x03		! read cursor pos
+-	xor	bh,bh
+-	int	0x10
+-	
+-	mov	cx,#9
+-	mov	bx,#0x0007		! page 0, attribute 7 (normal)
+-	mov	bp,#msg1
+-	mov	ax,#0x1301		! write string, move cursor
+-	int	0x10
++# Print some inane message
+ 
+-! ok, we've written the message, now
+-! we want to load the system (at 0x10000)
++	mov	$0x03, %ah	    	# read cursor pos
++	xor	%bh, %bh
++	int	$0x10               # dh(row 0-24) dl(col 0-79)
++	mov	$32, %cx            # nr of characters
++	mov	$0x000b, %bx		# page 0, attribute b 
++	mov $msg1, %bp
++	mov	$0x1301, %ax		# write string, move cursor
++	int	$0x10
+ 
+-	mov	ax,#SYSSEG
+-	mov	es,ax		! segment of 0x010000
+-	call	read_it
+-	call	kill_motor
+-	call	print_nl
++# ok, we've written the message, now
++# we want to load the system (at 0x10000)
+ 
+-! After that we check which root-device to use. If the device is
+-! defined (!= 0), nothing is done and the given device is used.
+-! Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
+-! on the number of sectors that the BIOS reports currently.
++	mov	$SYSSEG, %ax
++	mov	%ax, %es		# segment of 0x010000
++	call read_it
++	call kill_motor
+ 
+-	seg cs
+-	mov	ax,root_dev
+-	or	ax,ax
+-	jne	root_defined
+-	seg cs
+-	mov	bx,sectors
+-	mov	ax,#0x0208		! /dev/ps0 - 1.2Mb
+-	cmp	bx,#15
++# After that we check which root-device to use. If the device is
++# defined (#= 0), nothing is done and the given device is used.
++# Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
++# on the number of sectors that the BIOS reports currently.
++
++	mov	%cs:root_dev+0, %ax #0x301
++	cmp	$0, %ax
++	jne	root_defined        # ROOT_DEV has defined
++	mov	%cs:sectors+0, %bx
++	mov	$0x0208, %ax		# /dev/ps0 - 1.2Mb
++	cmp	$15, %bx
+ 	je	root_defined
+-	mov	ax,#0x021c		! /dev/PS0 - 1.44Mb
+-	cmp	bx,#18
++	mov	$0x021c, %ax		# /dev/PS0 - 1.44Mb
++	cmp	$18, %bx
+ 	je	root_defined
+ undef_root:
+ 	jmp undef_root
+ root_defined:
+-	seg cs
+-	mov	root_dev,ax
++	mov	%ax, %cs:root_dev+0
+ 
+-! after that (everyting loaded), we jump to
+-! the setup-routine loaded directly after
+-! the bootblock:
++# after that (everyting loaded), we jump to
++# the setup-routine loaded directly after
++# the bootblock:
+ 
+-	jmpi	0,SETUPSEG
++	ljmp	$SETUPSEG, $0
+ 
+-! This routine loads the system at address 0x10000, making sure
+-! no 64kB boundaries are crossed. We try to load it as fast as
+-! possible, loading whole tracks whenever we can.
+-!
+-! in:	es - starting address segment (normally 0x1000)
+-!
+-sread:	.word 1+SETUPLEN	! sectors read of current track
+-head:	.word 0			! current head
+-track:	.word 0			! current track
++# This routine loads the system at address 0x10000, making sure
++# no 64kB boundaries are crossed. We try to load it as fast as
++# possible, loading whole tracks whenever we can.
++#
++# in:	es - starting address segment (normally 0x1000)
++#
++sread:	.word 1+ SETUPLEN	# sectors read of current track
++head:	.word 0			    # current head
++track:	.word 0		    	# current track
+ 
+ read_it:
+-	mov ax,es
+-	test ax,#0x0fff
+-die:	jne die			! es must be at 64kB boundary
+-	xor bx,bx		! bx is starting address within segment
++	mov	%es, %ax
++	test $0x0fff, %ax
++die:
++    jne die			        # es must be at 64kB boundary
++	xor %bx, %bx		    # bx is starting address within segment
+ rp_read:
+-	mov ax,es
+-	cmp ax,#ENDSEG		! have we loaded all yet?
+-	jb ok1_read
++	mov %es, %ax
++ 	cmp $ENDSEG, %ax	    # have we loaded all yet?
++	jb	ok1_read
+ 	ret
+ ok1_read:
+-	seg cs
+-	mov ax,sectors
+-	sub ax,sread
+-	mov cx,ax
+-	shl cx,#9
+-	add cx,bx
++	mov	%cs:sectors+0, %ax
++	sub	sread, %ax
++	mov	%ax, %cx
++	shl	$9, %cx
++	add	%bx, %cx
+ 	jnc ok2_read
+-	je ok2_read
+-	xor ax,ax
+-	sub ax,bx
+-	shr ax,#9
++	je 	ok2_read
++	xor %ax, %ax
++	sub %bx, %ax
++	shr $9, %ax
+ ok2_read:
+ 	call read_track
+-	mov cx,ax
+-	add ax,sread
+-	seg cs
+-	cmp ax,sectors
++	mov %ax, %cx
++	add sread, %ax
++	cmp %cs:sectors+0, %ax
+ 	jne ok3_read
+-	mov ax,#1
+-	sub ax,head
++	mov $1, %ax
++	sub head, %ax
+ 	jne ok4_read
+-	inc track
++	incw track 
+ ok4_read:
+-	mov head,ax
+-	xor ax,ax
++	mov	%ax, head
++	xor	%ax, %ax
+ ok3_read:
+-	mov sread,ax
+-	shl cx,#9
+-	add bx,cx
+-	jnc rp_read
+-	mov ax,es
+-	add ah,#0x10
+-	mov es,ax
+-	xor bx,bx
+-	jmp rp_read
++	mov	%ax, sread
++	shl	$9, %cx
++	add	%cx, %bx
++	jnc	rp_read
++	mov	%es, %ax
++	add	$0x1000, %ax
++	mov	%ax, %es
++	xor	%bx, %bx
++	jmp	rp_read
+ 
+ read_track:
+-	pusha
+-	pusha	
+-	mov	ax, #0xe2e 	! loading... message 2e = .
+-	mov	bx, #7
+- 	int	0x10
+-	popa		
+-
+-	mov dx,track
+-	mov cx,sread
+-	inc cx
+-	mov ch,dl
+-	mov dx,head
+-	mov dh,dl
+-	and dx,#0x0100
+-	mov ah,#2
+-	
+-	push	dx				! save for error dump
+-	push	cx
+-	push	bx
+-	push	ax
+-
+-	int 0x13
+-	jc bad_rt
+-	add	sp, #8   	
+-	popa
++	push %ax
++	push %bx
++	push %cx
++	push %dx
++	mov	track, %dx
++	mov	sread, %cx
++	inc	%cx
++	mov	%dl, %ch
++	mov	head, %dx
++	mov	%dl, %dh
++	mov	$0, %dl
++	and	$0x0100, %dx
++	mov	$2, %ah
++	int	$0x13
++	jc	bad_rt
++	pop	%dx
++	pop	%cx
++	pop	%bx
++	pop	%ax
+ 	ret
++bad_rt:	mov	$0, %ax
++	mov	$0, %dx
++	int	$0x13
++	pop	%dx
++	pop	%cx
++	pop	%bx
++	pop	%ax
++	jmp	read_track
+ 
+-bad_rt:	push	ax				! save error code
+-	call	print_all			! ah = error, al = read
+-	
+-	
+-	xor ah,ah
+-	xor dl,dl
+-	int 0x13
+-	
+-
+-	add	sp, #10
+-	popa	
+-	jmp read_track
+-
+-/*
+- *	print_all is for debugging purposes.  
+- *	It will print out all of the registers.  The assumption is that this is
+- *	called from a routine, with a stack frame like
+- *	dx 
+- *	cx
+- *	bx
+- *	ax
+- *	error
+- *	ret <- sp
+- *
+-*/
+- 
+-print_all:
+-	mov	cx, #5		! error code + 4 registers
+-	mov	bp, sp	
+-
+-print_loop:
+-	push	cx		! save count left
+-	call	print_nl	! nl for readability
+-	jae	no_reg		! see if register name is needed
+-	
+-	mov	ax, #0xe05 + 0x41 - 1
+-	sub	al, cl
+-	int	0x10
+-
+-	mov	al, #0x58 	! X
+-	int	0x10
+-
+-	mov	al, #0x3a 	! :
+-	int	0x10
+-
+-no_reg:
+-	add	bp, #2		! next register
+-	call	print_hex	! print it
+-	pop	cx
+-	loop	print_loop
+-	ret
+-
+-print_nl:
+-	mov	ax, #0xe0d	! CR
+-	int	0x10
+-	mov	al, #0xa	! LF
+-	int 	0x10
+-	ret
+-
+-/*
+- *	print_hex is for debugging purposes, and prints the word
+- *	pointed to by ss:bp in hexadecmial.
+-*/
+-
+-print_hex:
+-	mov	cx, #4		! 4 hex digits
+-	mov	dx, (bp)	! load word into dx
+-print_digit:
+-	rol	dx, #4		! rotate so that lowest 4 bits are used
+-	mov	ah, #0xe	
+-	mov	al, dl		! mask off so we have only next nibble
+-	and	al, #0xf
+-	add	al, #0x30	! convert to 0 based digit, '0'
+-	cmp	al, #0x39	! check for overflow
+-	jbe	good_digit
+-	add	al, #0x41 - 0x30 - 0xa 	! 'A' - '0' - 0xa
+-
+-good_digit:
+-	int	0x10
+-	loop	print_digit
+-	ret
+-
+-
+-/*
+- * This procedure turns off the floppy drive motor, so
+- * that we enter the kernel in a known state, and
+- * don't have to worry about it later.
+- */
++#/*
++# * This procedure turns off the floppy drive motor, so
++# * that we enter the kernel in a known state, and
++# * don't have to worry about it later.
++# */
+ kill_motor:
+-	push dx
+-	mov dx,#0x3f2
+-	xor al, al
+-	outb
+-	pop dx
++	push %dx
++	mov	$0x3f2, %dx
++	mov	$0, %al
++	outsb
++	pop	%dx
+ 	ret
+ 
+ sectors:
+@@ -385,20 +255,20 @@
+ 
+ msg1:
+ 	.byte 13,10
+-	.ascii "Loading"
++	.ascii "linux 0.12 OS is booting ..."
++	.byte 13,10
+ 
+-.org 506
++	.org 506
+ swap_dev:
+-	.word SWAP_DEV
++    .word SWAP_DEV
+ root_dev:
+ 	.word ROOT_DEV
+ boot_flag:
+ 	.word 0xAA55
+-
+-.text
+-endtext:
+-.data
+-enddata:
+-.bss
+-endbss:
+-
++	
++	.text
++	endtext:
++	.data
++	enddata:
++	.bss
++	endbss:
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/head.s patch-new/linux-0.12/boot/head.s
+--- patch-old/linux-0.12/boot/head.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/boot/head.s	2026-04-04 13:12:07
+@@ -12,28 +12,30 @@
+  * the page directory.
+  */
+ .text
+-.globl _idt,_gdt,_pg_dir,_tmp_floppy_area
+-_pg_dir:
++.globl idt,gdt,pg_dir,tmp_floppy_area
++pg_dir:
++.globl startup_32
+ startup_32:
+ 	movl $0x10,%eax
+ 	mov %ax,%ds
+ 	mov %ax,%es
+ 	mov %ax,%fs
+ 	mov %ax,%gs
+-	lss _stack_start,%esp
++	lss stack_start,%esp
+ 	call setup_idt
+ 	call setup_gdt
+ 	movl $0x10,%eax		# reload all the segment registers
+-	mov %ax,%ds		# after changing gdt. CS was already
+-	mov %ax,%es		# reloaded in 'setup_gdt'
++	mov %ax,%ds		    # after changing gdt. CS was already
++	mov %ax,%es		    # reloaded in 'setup_gdt'
+ 	mov %ax,%fs
+ 	mov %ax,%gs
+-	lss _stack_start,%esp
++	lss stack_start,%esp
+ 	xorl %eax,%eax
+-1:	incl %eax		# check that A20 really IS enabled
++1:	incl %eax		    # check that A20 really IS enabled
+ 	movl %eax,0x000000	# loop forever if it isn't
+ 	cmpl %eax,0x100000
+ 	je 1b
++
+ /*
+  * NOTE! 486 should set bit 16, to check for write-protect in supervisor
+  * mode. Then it would be unnecessary with the "verify_area()"-calls.
+@@ -80,8 +82,7 @@
+ 	movl $0x00080000,%eax
+ 	movw %dx,%ax		/* selector = 0x0008 = cs */
+ 	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
+-
+-	lea _idt,%edi
++	lea idt,%edi
+ 	mov $256,%ecx
+ rp_sidt:
+ 	movl %eax,(%edi)
+@@ -129,7 +130,7 @@
+  * reach to a buffer-block. It needs to be aligned, so that it isn't
+  * on a 64kB border.
+  */
+-_tmp_floppy_area:
++tmp_floppy_area:
+ 	.fill 1024,1,0
+ 
+ after_page_tables:
+@@ -137,7 +138,7 @@
+ 	pushl $0
+ 	pushl $0
+ 	pushl $L6		# return address for main, if it decides to.
+-	pushl $_main
++	pushl $main
+ 	jmp setup_paging
+ L6:
+ 	jmp L6			# main should never return here, but
+@@ -159,7 +160,7 @@
+ 	mov %ax,%es
+ 	mov %ax,%fs
+ 	pushl $int_msg
+-	call _printk
++	call printk
+ 	popl %eax
+ 	pop %fs
+ 	pop %es
+@@ -200,38 +201,41 @@
+ 	xorl %eax,%eax
+ 	xorl %edi,%edi			/* pg_dir is at 0x000 */
+ 	cld;rep;stosl
+-	movl $pg0+7,_pg_dir		/* set present bit/user r/w */
+-	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
+-	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
+-	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
+-	movl $pg3+4092,%edi
++	movl $pg0+7,pg_dir		/* entry[0]: set present bit/user r/w */
++	movl $pg1+7,pg_dir+4	/* entry[1]:  --------- " " --------- */
++	movl $pg2+7,pg_dir+8	/* entry[2]:  --------- " " --------- */
++	movl $pg3+7,pg_dir+12	/* entry[3]:  --------- " " --------- */
++	movl $pg3+4092,%edi     /* 0x00004ffc */ 
+ 	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
+ 	std
+-1:	stosl			/* fill pages backwards - more efficient :-) */
++1:	stosl			        /* fill pages backwards - more efficient :-) */
+ 	subl $0x1000,%eax
+ 	jge 1b
+-	xorl %eax,%eax		/* pg_dir is at 0x0000 */
+-	movl %eax,%cr3		/* cr3 - page directory start */
++	cld
++	xorl %eax,%eax		    /* pg_dir is at 0x0000 */
++	movl %eax,%cr3		    /* cr3 - page directory start */
+ 	movl %cr0,%eax
+ 	orl $0x80000000,%eax
+-	movl %eax,%cr0		/* set paging (PG) bit */
+-	ret			/* this also flushes prefetch-queue */
++	movl %eax,%cr0		    /* set paging (PG) bit */
++	ret			            /* this also flushes prefetch-queue */
+ 
+ .align 2
+ .word 0
+ idt_descr:
+ 	.word 256*8-1		# idt contains 256 entries
+-	.long _idt
++	.long idt
+ .align 2
+ .word 0
+ gdt_descr:
+ 	.word 256*8-1		# so does gdt (not that that's any
+-	.long _gdt		# magic number, but it works for me :^)
++	.long gdt		    # magic number, but it works for me :^)
+ 
+-	.align 3
+-_idt:	.fill 256,8,0		# idt is uninitialized
++	.align 8
++idt:	
++    .fill 256,8,0		# idt is uninitialized
+ 
+-_gdt:	.quad 0x0000000000000000	/* NULL descriptor */
++gdt:	
++    .quad 0x0000000000000000	/* NULL descriptor */
+ 	.quad 0x00c09a0000000fff	/* 16Mb */
+ 	.quad 0x00c0920000000fff	/* 16Mb */
+ 	.quad 0x0000000000000000	/* TEMPORARY - don't use */
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/setup.S patch-new/linux-0.12/boot/setup.S
+--- patch-old/linux-0.12/boot/setup.S	2026-04-04 13:12:07
++++ patch-new/linux-0.12/boot/setup.S	2026-04-04 13:12:07
+@@ -1,628 +1,359 @@
+-!
+-!	setup.s		(C) 1991 Linus Torvalds
+-!
+-! setup.s is responsible for getting the system data from the BIOS,
+-! and putting them into the appropriate places in system memory.
+-! both setup.s and system has been loaded by the bootblock.
+-!
+-! This code asks the bios for memory/disk/other parameters, and
+-! puts them in a "safe" place: 0x90000-0x901FF, ie where the
+-! boot-block used to be. It is then up to the protected mode
+-! system to read them from there before the area is overwritten
+-! for buffer-blocks.
+-!
++	.code16
++# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
++#
++#	setup.s		(C) 1991 Linus Torvalds
++#
++# setup.s is responsible for getting the system data from the BIOS,
++# and putting them into the appropriate places in system memory.
++# both setup.s and system has been loaded by the bootblock.
++#
++# This code asks the bios for memory/disk/other parameters, and
++# puts them in a "safe" place: 0x90000-0x901FF, ie where the
++# boot-block used to be. It is then up to the protected mode
++# system to read them from there before the area is overwritten
++# for buffer-blocks.
++#
+ 
+-! NOTE! These had better be the same as in bootsect.s!
+-#include <linux/config.h>
++# NOTE! These had better be the same as in bootsect.s!
+ 
+-INITSEG  = DEF_INITSEG	! we move boot here - out of the way
+-SYSSEG   = DEF_SYSSEG	! system loaded at 0x10000 (65536).
+-SETUPSEG = DEF_SETUPSEG	! this is the current segment
++	.equ INITSEG, 0x9000	# we move boot here - out of the way
++	.equ SYSSEG, 0x1000	# system loaded at 0x10000 (65536).
++	.equ SETUPSEG, 0x9020	# this is the current segment
+ 
+-.globl begtext, begdata, begbss, endtext, enddata, endbss
+-.text
+-begtext:
+-.data
+-begdata:
+-.bss
+-begbss:
+-.text
++	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
++	.text
++	begtext:
++	.data
++	begdata:
++	.bss
++	begbss:
++	.text
+ 
+-entry start
+-start:
++	ljmp $SETUPSEG, $_start	#phaddr: 0x90205
++_start:
++	mov %cs,%ax         #0x9020
++	mov %ax,%ds
++	mov %ax,%es
++#
++##print some message
++#
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $27, %cx
++	mov $0x000b,%bx
++	mov $msg2,%bp
++	mov $0x1301, %ax
++	int $0x10
+ 
+-! ok, the read went well so we get current cursor position and save it for
+-! posterity.
++# ok, the read went well so we get current cursor position and save it for
++# posterity.
++	mov	$INITSEG, %ax	# this is done in bootsect already, but...
++	mov	%ax, %ds
++	mov	$0x03, %ah	    # read cursor pos
++	xor	%bh, %bh
++	int	$0x10		    # save it in known place, con_init fetches
++	mov	%dx, %ds:0	    # it from 0x90000.
+ 
+-	mov	ax,#INITSEG	! this is done in bootsect already, but...
+-	mov	ds,ax
++# Get memory size (extended mem, kB)
++    mov $INITSEG, %ax
++    mov %ax, %ds 
++	mov	$0x88, %ah 
++	int	$0x15
++	mov	%ax, %ds:2      # save the value of extended memory size in 0x90002,
++                        # which excludes 1MB. (it's 15MB in this case)
+ 
+-! Get memory size (extended mem, kB)
++# Get video-card data:
++    mov $INITSEG, %ax
++    mov %ax, %ds 
++	mov	$0x0f, %ah
++	int	$0x10
++	mov	%bx, %ds:4	    # bh = display page (0x00)
++	mov	%ax, %ds:6	    # al = video mode, ah = window width (0x50,0x03)
++                        # 80x25(col*row)
+ 
+-	mov	ah,#0x88
+-	int	0x15
+-	mov	[2],ax
++# check for EGA/VGA and some config parameters
++    mov $INITSEG, %ax
++    mov %ax, %ds
++	mov	$0x12, %ah
++	mov	$0x10, %bl
++	int	$0x10
++	mov	%ax, %ds:8      # ???
++	mov	%bx, %ds:10     # bh = video mode bl = video memory size(256KB)
++	mov	%cx, %ds:12     # EGA 80x25
+ 
+-! check for EGA/VGA and some config parameters
++    mov $0x5019, %ax    # 80x25
++    mov %ax, %ds:14
+ 
+-	mov	ah,#0x12
+-	mov	bl,#0x10
+-	int	0x10
+-	mov	[8],ax
+-	mov	[10],bx
+-	mov	[12],cx
+-	mov	ax,#0x5019
+-	cmp	bl,#0x10
+-	je	novga
+-	call	chsvga
+-novga:	mov	[14],ax
+-	mov	ah,#0x03	! read cursor pos
+-	xor	bh,bh
+-	int	0x10		! save it in known place, con_init fetches
+-	mov	[0],dx		! it from 0x90000.
+-	
+-! Get video-card data:
+-	
+-	mov	ah,#0x0f
+-	int	0x10
+-	mov	[4],bx		! bh = display page
+-	mov	[6],ax		! al = video mode, ah = window width
++# Get hd0 data(fixed disk parameter table)
+ 
+-! Get hd0 data
+-
+-	mov	ax,#0x0000
+-	mov	ds,ax
+-	lds	si,[4*0x41]
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	di,#0x0080
+-	mov	cx,#0x10
++	mov	$0x0000, %ax
++	mov	%ax, %ds
++	lds	%ds:4*0x41, %si # src
++	mov	$INITSEG, %ax
++	mov	%ax, %es
++	mov	$0x0080, %di    # dst: 0x90080
++	mov	$0x10, %cx      # the size of FDPT is 16)
+ 	rep
+ 	movsb
+ 
+-! Get hd1 data
++# Get hd1 data
+ 
+-	mov	ax,#0x0000
+-	mov	ds,ax
+-	lds	si,[4*0x46]
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	di,#0x0090
+-	mov	cx,#0x10
++	mov	$0x0000, %ax
++	mov	%ax, %ds
++	lds	%ds:4*0x46, %si #
++	mov	$INITSEG, %ax
++	mov	%ax, %es
++	mov	$0x0090, %di
++	mov	$0x10, %cx
+ 	rep
+ 	movsb
+ 
+-! Check that there IS a hd1 :-)
++## modify ds
++	mov $INITSEG,%ax
++	mov %ax,%ds
++	mov $SETUPSEG,%ax
++	mov %ax,%es
+ 
+-	mov	ax,#0x01500
+-	mov	dl,#0x81
+-	int	0x13
++##show cursor pos:
++	mov $0x03, %ah 
++	xor %bh,%bh
++	int $0x10
++	mov $11,%cx
++	mov $0x000a,%bx
++	mov $cur,%bp
++	mov $0x1301,%ax
++	int $0x10
++##show detail(row*col)
++	mov %ds:0 ,%ax
++	call print_hex
++	call print_nl
++
++##show memory size
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $12, %cx
++	mov $0x000a, %bx
++	mov $mem, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail(KB)
++	mov %ds:2 , %ax
++	call print_hex
++
++##show nr of cylinders
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $25, %cx
++	mov $0x000a, %bx
++	mov $cyl, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail
++	mov %ds:0x80, %ax
++	call print_hex
++	call print_nl
++
++##show nr of heads
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $9, %cx
++	mov $0x000a, %bx
++	mov $head, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail
++	mov %ds:0x82, %ax
++	call print_hex
++	call print_nl
++
++##show nr of sectors per track 
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $9, %cx
++	mov $0x000a, %bx
++	mov $sect, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail
++	mov %ds:0x8e, %ax
++	call print_hex
++	call print_nl
++
++# Check that there IS a hd1 :-)
++
++	mov	$0x01500, %ax
++	mov	$0x81, %dl
++	int	$0x13
+ 	jc	no_disk1
+-	cmp	ah,#3
++	cmp	$3, %ah
+ 	je	is_disk1
+ no_disk1:
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	di,#0x0090
+-	mov	cx,#0x10
+-	mov	ax,#0x00
+-	rep
++	mov	$INITSEG, %ax
++	mov	%ax, %es
++	mov	$0x0090, %di
++	mov	$0x10, %cx
++	mov	$0x00, %ax
++	rep             # clear       
+ 	stosb
+ is_disk1:
+ 
+-! now we want to move to protected mode ...
++# now we want to move to protected mode ...
+ 
+-	cli			! no interrupts allowed !
++	cli			    # no interrupts allowed ! 
+ 
+-! first we move the system to it's rightful place
++# first we move the system to its rightful place(load kernel module)
+ 
+-	mov	ax,#0x0000
+-	cld			! 'direction'=0, movs moves forward
++	mov	$0x0000, %ax
++	cld			    # 'direction'=0, movs moves forward
+ do_move:
+-	mov	es,ax		! destination segment
+-	add	ax,#0x1000
+-	cmp	ax,#0x9000
++	mov	%ax, %es	# destination segment
++	add	$0x1000, %ax
++	cmp	$0x9000, %ax # 0x9000 SYS_SIZE 
+ 	jz	end_move
+-	mov	ds,ax		! source segment
+-	sub	di,di
+-	sub	si,si
+-	mov 	cx,#0x8000
++	mov	%ax, %ds	# source segment
++	sub	%di, %di
++	sub	%si, %si
++	mov $0x8000, %cx
+ 	rep
+ 	movsw
+ 	jmp	do_move
+ 
+-! then we load the segment descriptors
++# then we load the segment descriptors
+ 
+ end_move:
+-	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
+-	mov	ds,ax
+-	lidt	idt_48		! load idt with 0,0
+-	lgdt	gdt_48		! load gdt with whatever appropriate
++	mov	$SETUPSEG, %ax	# right, forgot this at first. didn't work :-)
++	mov	%ax, %ds        # 0x9020
++	lidt idt_48		    # load idt with 0,0
++	lgdt gdt_48		    # load gdt with whatever appropriate
+ 
+-! that was painless, now we enable A20
++# that was painless, now we enable A20
+ 
+-	call	empty_8042
+-	mov	al,#0xD1		! command write
+-	out	#0x64,al
+-	call	empty_8042
+-	mov	al,#0xDF		! A20 on
+-	out	#0x60,al
+-	call	empty_8042
++	inb     $0x92, %al	# open A20 line(Fast Gate A20).
++	orb     $0b00000010, %al
++	outb    %al, $0x92
+ 
+-! well, that went ok, I hope. Now we have to reprogram the interrupts :-(
+-! we put them right after the intel-reserved hardware interrupts, at
+-! int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
+-! messed this up with the original PC, and they haven't been able to
+-! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
+-! which is used for the internal hardware interrupts as well. We just
+-! have to reprogram the 8259's, and it isn't fun.
++# well, that went ok, I hope. Now we have to reprogram the interrupts :-(
++# we put them right after the intel-reserved hardware interrupts, at
++# int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
++# messed this up with the original PC, and they haven't been able to
++# rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
++# which is used for the internal hardware interrupts as well. We just
++# have to reprogram the 8259's, and it isn't fun.
+ 
+-	mov	al,#0x11		! initialization sequence
+-	out	#0x20,al		! send it to 8259A-1
+-	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
+-	out	#0xA0,al		! and to 8259A-2
++	mov	$0x11, %al		# initialization sequence(ICW1)
++					    # ICW4 needed(1),CASCADE mode,Level-triggered
++	out	%al, $0x20		# send it to 8259A-1
++	.word   0x00eb,0x00eb		# jmp $+2, jmp $+2
++	out	%al, $0xA0		# and to 8259A-2
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x20		! start of hardware int's (0x20)
+-	out	#0x21,al
++	mov	$0x20, %al		# start of hardware int's (0x20)(ICW2)
++	out	%al, $0x21		# from 0x20-0x27
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x28		! start of hardware int's 2 (0x28)
+-	out	#0xA1,al
++	mov	$0x28, %al		# start of hardware int's 2 (0x28)
++	out	%al, $0xA1		# from 0x28-0x2F
++	.word	0x00eb,0x00eb		# IR 7654 3210
++	mov	$0x04, %al		# 8259-1 is master(0000 0100)
++	out	%al, $0x21		# 
++	.word	0x00eb,0x00eb		# INT
++	mov	$0x02, %al		# 8259-2 is slave(010 --> 2)
++	out	%al, $0xA1
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x04		! 8259-1 is master
+-	out	#0x21,al
++	mov	$0x01, %al		# 8086 mode for both
++	out	%al, $0x21
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x02		! 8259-2 is slave
+-	out	#0xA1,al
++	out	%al, $0xA1
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x01		! 8086 mode for both
+-	out	#0x21,al
++	mov	$0xFF, %al		# mask off all interrupts for now
++	out	%al, $0x21
+ 	.word	0x00eb,0x00eb
+-	out	#0xA1,al
+-	.word	0x00eb,0x00eb
+-	mov	al,#0xFF		! mask off all interrupts for now
+-	out	#0x21,al
+-	.word	0x00eb,0x00eb
+-	out	#0xA1,al
++	out	%al, $0xA1
+ 
+-! well, that certainly wasn't fun :-(. Hopefully it works, and we don't
+-! need no steenking BIOS anyway (except for the initial loading :-).
+-! The BIOS-routine wants lots of unnecessary data, and it's less
+-! "interesting" anyway. This is how REAL programmers do it.
+-!
+-! Well, now's the time to actually move into protected mode. To make
+-! things as simple as possible, we do no register set-up or anything,
+-! we let the gnu-compiled 32-bit programs do that. We just jump to
+-! absolute address 0x00000, in 32-bit protected mode.
++# well, that certainly wasn't fun :-(. Hopefully it works, and we don't
++# need no steenking BIOS anyway (except for the initial loading :-).
++# The BIOS-routine wants lots of unnecessary data, and it's less
++# "interesting" anyway. This is how REAL programmers do it.
++#
++# Well, now's the time to actually move into protected mode. To make
++# things as simple as possible, we do no register set-up or anything,
++# we let the gnu-compiled 32-bit programs do that. We just jump to
++# absolute address 0x00000, in 32-bit protected mode.
++	mov	%cr0, %eax	# get machine status(cr0|MSW)	
++	bts	$0, %eax	# turn on the PE-bit 
++	mov	%eax, %cr0	# protection enabled
++				
++				            # segment-descriptor        (INDEX:TI:RPL)
++	.equ	sel_cs0, 0x0008 # select for code segment 0 (  001:0 :00) 
++	ljmp	$sel_cs0, $0	# jmp offset 0 of code segment 0 in gdt
+ 
+-	mov	ax,#0x0001	! protected mode (PE) bit
+-	lmsw	ax		! This is it!
+-	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+-
+-! This routine checks that the keyboard command queue is empty
+-! No timeout is used - if this hangs there is something wrong with
+-! the machine, and we probably couldn't proceed anyway.
+-empty_8042:
+-	.word	0x00eb,0x00eb
+-	in	al,#0x64	! 8042 status port
+-	test	al,#2		! is input buffer full?
+-	jnz	empty_8042	! yes - loop
+-	ret
+-
+-! Routine trying to recognize type of SVGA-board present (if any)
+-! and if it recognize one gives the choices of resolution it offers.
+-! If one is found the resolution chosen is given by al,ah (rows,cols).
+-
+-chsvga:	cld
+-	push	ds
+-	push	cs
+-	pop	ds
+-	mov 	ax,#0xc000
+-	mov	es,ax
+-	lea	si,msg1
+-	call	prtstr
+-nokey:	in	al,#0x60
+-	cmp	al,#0x82
+-	jb	nokey
+-	cmp	al,#0xe0
+-	ja	nokey
+-	cmp	al,#0x9c
+-	je	svga
+-	mov	ax,#0x5019
+-	pop	ds
+-	ret
+-svga:	lea 	si,idati		! Check ATI 'clues'
+-	mov	di,#0x31
+-	mov 	cx,#0x09
+-	repe
+-	cmpsb
+-	jne	noati
+-	lea	si,dscati
+-	lea	di,moati
+-	lea	cx,selmod
+-	jmp	cx
+-noati:	mov	ax,#0x200f		! Check Ahead 'clues'
+-	mov	dx,#0x3ce
+-	out	dx,ax
+-	inc	dx
+-	in	al,dx
+-	cmp	al,#0x20
+-	je	isahed
+-	cmp	al,#0x21
+-	jne	noahed
+-isahed:	lea	si,dscahead
+-	lea	di,moahead
+-	lea	cx,selmod
+-	jmp	cx
+-noahed:	mov	dx,#0x3c3		! Check Chips & Tech. 'clues'
+-	in	al,dx
+-	or	al,#0x10
+-	out	dx,al
+-	mov	dx,#0x104		
+-	in	al,dx
+-	mov	bl,al
+-	mov	dx,#0x3c3
+-	in	al,dx
+-	and	al,#0xef
+-	out	dx,al
+-	cmp	bl,[idcandt]
+-	jne	nocant
+-	lea	si,dsccandt
+-	lea	di,mocandt
+-	lea	cx,selmod
+-	jmp	cx
+-nocant:	mov	dx,#0x3d4		! Check Cirrus 'clues'
+-	mov	al,#0x0c
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bl,al
+-	xor	al,al
+-	out	dx,al
+-	dec	dx
+-	mov	al,#0x1f
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bh,al
+-	xor	ah,ah
+-	shl	al,#4
+-	mov	cx,ax
+-	mov	al,bh
+-	shr	al,#4
+-	add	cx,ax
+-	shl	cx,#8
+-	add	cx,#6
+-	mov	ax,cx
+-	mov	dx,#0x3c4
+-	out	dx,ax
+-	inc	dx
+-	in	al,dx
+-	and	al,al
+-	jnz	nocirr
+-	mov	al,bh
+-	out	dx,al
+-	in	al,dx
+-	cmp	al,#0x01
+-	jne	nocirr
+-	call	rst3d4	
+-	lea	si,dsccirrus
+-	lea	di,mocirrus
+-	lea	cx,selmod
+-	jmp	cx
+-rst3d4:	mov	dx,#0x3d4
+-	mov	al,bl
+-	xor	ah,ah
+-	shl	ax,#8
+-	add	ax,#0x0c
+-	out	dx,ax
+-	ret	
+-nocirr:	call	rst3d4			! Check Everex 'clues'
+-	mov	ax,#0x7000
+-	xor	bx,bx
+-	int	0x10
+-	cmp	al,#0x70
+-	jne	noevrx
+-	shr	dx,#4
+-	cmp	dx,#0x678
+-	je	istrid
+-	cmp	dx,#0x236
+-	je	istrid
+-	lea	si,dsceverex
+-	lea	di,moeverex
+-	lea	cx,selmod
+-	jmp	cx
+-istrid:	lea	cx,ev2tri
+-	jmp	cx
+-noevrx:	lea	si,idgenoa		! Check Genoa 'clues'
+-	xor 	ax,ax
+-	seg es
+-	mov	al,[0x37]
+-	mov	di,ax
+-	mov	cx,#0x04
+-	dec	si
+-	dec	di
+-l1:	inc	si
+-	inc	di
+-	mov	al,(si)
+-	seg es
+-	and	al,(di)
+-	cmp	al,(si)
+-	loope 	l1
+-	cmp	cx,#0x00
+-	jne	nogen
+-	lea	si,dscgenoa
+-	lea	di,mogenoa
+-	lea	cx,selmod
+-	jmp	cx
+-nogen:	lea	si,idparadise		! Check Paradise 'clues'
+-	mov	di,#0x7d
+-	mov	cx,#0x04
+-	repe
+-	cmpsb
+-	jne	nopara
+-	lea	si,dscparadise
+-	lea	di,moparadise
+-	lea	cx,selmod
+-	jmp	cx
+-nopara:	mov	dx,#0x3c4		! Check Trident 'clues'
+-	mov	al,#0x0e
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	xchg	ah,al
+-	mov	al,#0x00
+-	out	dx,al
+-	in	al,dx
+-	xchg	al,ah
+-	mov	bl,al		! Strange thing ... in the book this wasn't
+-	and	bl,#0x02	! necessary but it worked on my card which
+-	jz	setb2		! is a trident. Without it the screen goes
+-	and	al,#0xfd	! blurred ...
+-	jmp	clrb2		!
+-setb2:	or	al,#0x02	!
+-clrb2:	out	dx,al
+-	and	ah,#0x0f
+-	cmp	ah,#0x02
+-	jne	notrid
+-ev2tri:	lea	si,dsctrident
+-	lea	di,motrident
+-	lea	cx,selmod
+-	jmp	cx
+-notrid:	mov	dx,#0x3cd		! Check Tseng 'clues'
+-	in	al,dx			! Could things be this simple ! :-)
+-	mov	bl,al
+-	mov	al,#0x55
+-	out	dx,al
+-	in	al,dx
+-	mov	ah,al
+-	mov	al,bl
+-	out	dx,al
+-	cmp	ah,#0x55
+- 	jne	notsen
+-	lea	si,dsctseng
+-	lea	di,motseng
+-	lea	cx,selmod
+-	jmp	cx
+-notsen:	mov	dx,#0x3cc		! Check Video7 'clues'
+-	in	al,dx
+-	mov	dx,#0x3b4
+-	and	al,#0x01
+-	jz	even7
+-	mov	dx,#0x3d4
+-even7:	mov	al,#0x0c
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bl,al
+-	mov	al,#0x55
+-	out	dx,al
+-	in	al,dx
+-	dec	dx
+-	mov	al,#0x1f
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bh,al
+-	dec	dx
+-	mov	al,#0x0c
+-	out	dx,al
+-	inc	dx
+-	mov	al,bl
+-	out	dx,al
+-	mov	al,#0x55
+-	xor	al,#0xea
+-	cmp	al,bh
+-	jne	novid7
+-	lea	si,dscvideo7
+-	lea	di,movideo7
+-selmod:	push	si
+-	lea	si,msg2
+-	call	prtstr
+-	xor	cx,cx
+-	mov	cl,(di)
+-	pop	si
+-	push	si
+-	push	cx
+-tbl:	pop	bx
+-	push	bx
+-	mov	al,bl
+-	sub	al,cl
+-	call	dprnt
+-	call	spcing
+-	lodsw
+-	xchg	al,ah
+-	call	dprnt
+-	xchg	ah,al
+-	push	ax
+-	mov	al,#0x78
+-	call	prnt1
+-	pop	ax
+-	call	dprnt
+-	call	docr
+-	loop	tbl
+-	pop	cx
+-	call	docr
+-	lea	si,msg3
+-	call	prtstr
+-	pop	si
+-	add	cl,#0x80
+-nonum:	in	al,#0x60	! Quick and dirty...
+-	cmp	al,#0x82
+-	jb	nonum
+-	cmp	al,#0x8b
+-	je	zero
+-	cmp	al,cl
+-	ja	nonum
+-	jmp	nozero
+-zero:	sub	al,#0x0a
+-nozero:	sub	al,#0x80
+-	dec	al
+-	xor	ah,ah
+-	add	di,ax
+-	inc	di
+-	push	ax
+-	mov	al,(di)
+-	int 	0x10
+-	pop	ax
+-	shl	ax,#1
+-	add	si,ax
+-	lodsw
+-	pop	ds
+-	ret
+-novid7:	pop	ds	! Here could be code to support standard 80x50,80x30
+-	mov	ax,#0x5019	
+-	ret
+-
+-! Routine that 'tabs' to next col.
+-
+-spcing:	mov	al,#0x2e
+-	call	prnt1
+-	mov	al,#0x20
+-	call	prnt1	
+-	mov	al,#0x20
+-	call	prnt1	
+-	mov	al,#0x20
+-	call	prnt1	
+-	mov	al,#0x20
+-	call	prnt1
+-	ret	
+-
+-! Routine to print asciiz-string at DS:SI
+-
+-prtstr:	lodsb
+-	and	al,al
+-	jz	fin
+-	call	prnt1
+-	jmp	prtstr
+-fin:	ret
+-
+-! Routine to print a decimal value on screen, the value to be
+-! printed is put in al (i.e 0-255). 
+-
+-dprnt:	push	ax
+-	push	cx
+-	mov	ah,#0x00		
+-	mov	cl,#0x0a
+-	idiv	cl
+-	cmp	al,#0x09
+-	jbe	lt100
+-	call	dprnt
+-	jmp	skip10
+-lt100:	add	al,#0x30
+-	call	prnt1
+-skip10:	mov	al,ah
+-	add	al,#0x30
+-	call	prnt1	
+-	pop	cx
+-	pop	ax
+-	ret
+-
+-! Part of above routine, this one just prints ascii al
+-
+-prnt1:	push	ax
+-	push	cx
+-	mov	bh,#0x00
+-	mov	cx,#0x01
+-	mov	ah,#0x0e
+-	int	0x10
+-	pop	cx
+-	pop	ax
+-	ret
+-
+-! Prints <CR> + <LF>
+-
+-docr:	push	ax
+-	push	cx
+-	mov	bh,#0x00
+-	mov	ah,#0x0e
+-	mov	al,#0x0a
+-	mov	cx,#0x01
+-	int	0x10
+-	mov	al,#0x0d
+-	int	0x10
+-	pop	cx
+-	pop	ax
+-	ret	
+-	
+ gdt:
+-	.word	0,0,0,0		! dummy
++	.word	0,0,0,0		# dummy
+ 
+-	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
+-	.word	0x0000		! base address=0
+-	.word	0x9A00		! code read/exec
+-	.word	0x00C0		! granularity=4096, 386
++	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
++	.word	0x0000		# base address=0
++	.word	0x9A00		# code read/exec
++	.word	0x00C0		# granularity=4096, 386
+ 
+-	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
+-	.word	0x0000		! base address=0
+-	.word	0x9200		! data read/write
+-	.word	0x00C0		! granularity=4096, 386
++	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
++	.word	0x0000		# base address=0
++	.word	0x9200		# data read/write
++	.word	0x00C0		# granularity=4096, 386
+ 
+ idt_48:
+-	.word	0			! idt limit=0
+-	.word	0,0			! idt base=0L
++	.word	0			# idt limit=0
++	.word	0,0			# idt base=0L
+ 
+ gdt_48:
+-	.word	0x800		! gdt limit=2048, 256 GDT entries
+-	.word	512+gdt,0x9	! gdt base = 0X9xxxx
++	.word	0x800			    # gdt limit=2048, 256 GDT entries
++	.word   512+gdt, 0x9		# gdt base = 0X9xxxx, 
++	# 512+gdt is the real gdt after setup is moved to 0x9020 * 0x10
+ 
+-msg1:		.ascii	"Press <RETURN> to see SVGA-modes available or any other key to continue."
+-		db	0x0d, 0x0a, 0x0a, 0x00
+-msg2:		.ascii	"Mode:  COLSxROWS:"
+-		db	0x0d, 0x0a, 0x0a, 0x00
+-msg3:		.ascii	"Choose mode by pressing the corresponding number."
+-		db	0x0d, 0x0a, 0x00
+-		
+-idati:		.ascii	"761295520"
+-idcandt:	.byte	0xa5
+-idgenoa:	.byte	0x77, 0x00, 0x66, 0x99
+-idparadise:	.ascii	"VGA="
++# print_hex()
++print_hex:
++	mov $4,%cx
++	mov %ax,%dx
++print_digit:
++	rol $4,%dx	    #循环以使低4位用上，高4位移至低4位
++	mov $0xe0f,%ax  #ah ＝ 请求的功能值，al = 半个字节的掩码
++	and %dl,%al
++	add $0x30,%al
++	cmp $0x3a,%al
++	jl outp
++	add $0x07,%al
++outp:
++	int $0x10
++	loop print_digit
++	ret
++#打印回车换行
++print_nl:
++	mov $0xe0d,%ax
++	int $0x10
++	mov $0xa,%al
++	int $0x10
++	ret
+ 
+-! Manufacturer:	  Numofmodes:	Mode:
+-
+-moati:		.byte	0x02,	0x23, 0x33 
+-moahead:	.byte	0x05,	0x22, 0x23, 0x24, 0x2f, 0x34
+-mocandt:	.byte	0x02,	0x60, 0x61
+-mocirrus:	.byte	0x04,	0x1f, 0x20, 0x22, 0x31
+-moeverex:	.byte	0x0a,	0x03, 0x04, 0x07, 0x08, 0x0a, 0x0b, 0x16, 0x18, 0x21, 0x40
+-mogenoa:	.byte	0x0a,	0x58, 0x5a, 0x60, 0x61, 0x62, 0x63, 0x64, 0x72, 0x74, 0x78
+-moparadise:	.byte	0x02,	0x55, 0x54
+-motrident:	.byte	0x07,	0x50, 0x51, 0x52, 0x57, 0x58, 0x59, 0x5a
+-motseng:	.byte	0x05,	0x26, 0x2a, 0x23, 0x24, 0x22
+-movideo7:	.byte	0x06,	0x40, 0x43, 0x44, 0x41, 0x42, 0x45
+-
+-!			msb = Cols lsb = Rows:
+-
+-dscati:		.word	0x8419, 0x842c
+-dscahead:	.word	0x842c, 0x8419, 0x841c, 0xa032, 0x5042
+-dsccandt:	.word	0x8419, 0x8432
+-dsccirrus:	.word	0x8419, 0x842c, 0x841e, 0x6425
+-dsceverex:	.word	0x5022, 0x503c, 0x642b, 0x644b, 0x8419, 0x842c, 0x501e, 0x641b, 0xa040, 0x841e
+-dscgenoa:	.word	0x5020, 0x642a, 0x8419, 0x841d, 0x8420, 0x842c, 0x843c, 0x503c, 0x5042, 0x644b
+-dscparadise:	.word	0x8419, 0x842b
+-dsctrident:	.word 	0x501e, 0x502b, 0x503c, 0x8419, 0x841e, 0x842b, 0x843c
+-dsctseng:	.word	0x503c, 0x6428, 0x8419, 0x841c, 0x842c
+-dscvideo7:	.word	0x502b, 0x503c, 0x643c, 0x8419, 0x842c, 0x841c
+-	
++msg2:
++	.byte 13,10
++	.ascii "Now we are in setup ..."
++	.byte 13,10
++cur:
++	.ascii "Cursor POS:"
++mem:
++	.ascii "Memory SIZE:"
++cyl:
++	.ascii "KB"
++	.byte 13,10
++	.ascii "HD Info:"
++	.byte 13,10
++	.ascii " Cylinders:"
++head:
++	.ascii " Headers:"
++sect:
++	.ascii " Secotrs:"
+ .text
+ endtext:
+ .data
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/setup.s patch-new/linux-0.12/boot/setup.s
+--- patch-old/linux-0.12/boot/setup.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/boot/setup.s	2026-04-04 13:12:07
+@@ -1,628 +1,359 @@
+-!
+-!	setup.s		(C) 1991 Linus Torvalds
+-!
+-! setup.s is responsible for getting the system data from the BIOS,
+-! and putting them into the appropriate places in system memory.
+-! both setup.s and system has been loaded by the bootblock.
+-!
+-! This code asks the bios for memory/disk/other parameters, and
+-! puts them in a "safe" place: 0x90000-0x901FF, ie where the
+-! boot-block used to be. It is then up to the protected mode
+-! system to read them from there before the area is overwritten
+-! for buffer-blocks.
+-!
++	.code16
++# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
++#
++#	setup.s		(C) 1991 Linus Torvalds
++#
++# setup.s is responsible for getting the system data from the BIOS,
++# and putting them into the appropriate places in system memory.
++# both setup.s and system has been loaded by the bootblock.
++#
++# This code asks the bios for memory/disk/other parameters, and
++# puts them in a "safe" place: 0x90000-0x901FF, ie where the
++# boot-block used to be. It is then up to the protected mode
++# system to read them from there before the area is overwritten
++# for buffer-blocks.
++#
+ 
+-! NOTE! These had better be the same as in bootsect.s!
+-#include <linux/config.h>
++# NOTE! These had better be the same as in bootsect.s!
+ 
+-INITSEG  = DEF_INITSEG	! we move boot here - out of the way
+-SYSSEG   = DEF_SYSSEG	! system loaded at 0x10000 (65536).
+-SETUPSEG = DEF_SETUPSEG	! this is the current segment
++	.equ INITSEG, 0x9000	# we move boot here - out of the way
++	.equ SYSSEG, 0x1000	# system loaded at 0x10000 (65536).
++	.equ SETUPSEG, 0x9020	# this is the current segment
+ 
+-.globl begtext, begdata, begbss, endtext, enddata, endbss
+-.text
+-begtext:
+-.data
+-begdata:
+-.bss
+-begbss:
+-.text
++	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
++	.text
++	begtext:
++	.data
++	begdata:
++	.bss
++	begbss:
++	.text
+ 
+-entry start
+-start:
++	ljmp $SETUPSEG, $_start	#phaddr: 0x90205
++_start:
++	mov %cs,%ax         #0x9020
++	mov %ax,%ds
++	mov %ax,%es
++#
++##print some message
++#
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $27, %cx
++	mov $0x000b,%bx
++	mov $msg2,%bp
++	mov $0x1301, %ax
++	int $0x10
+ 
+-! ok, the read went well so we get current cursor position and save it for
+-! posterity.
++# ok, the read went well so we get current cursor position and save it for
++# posterity.
++	mov	$INITSEG, %ax	# this is done in bootsect already, but...
++	mov	%ax, %ds
++	mov	$0x03, %ah	    # read cursor pos
++	xor	%bh, %bh
++	int	$0x10		    # save it in known place, con_init fetches
++	mov	%dx, %ds:0	    # it from 0x90000.
+ 
+-	mov	ax,#INITSEG	! this is done in bootsect already, but...
+-	mov	ds,ax
++# Get memory size (extended mem, kB)
++    mov $INITSEG, %ax
++    mov %ax, %ds 
++	mov	$0x88, %ah 
++	int	$0x15
++	mov	%ax, %ds:2      # save the value of extended memory size in 0x90002,
++                        # which excludes 1MB. (it's 15MB in this case)
+ 
+-! Get memory size (extended mem, kB)
++# Get video-card data:
++    mov $INITSEG, %ax
++    mov %ax, %ds 
++	mov	$0x0f, %ah
++	int	$0x10
++	mov	%bx, %ds:4	    # bh = display page (0x00)
++	mov	%ax, %ds:6	    # al = video mode, ah = window width (0x50,0x03)
++                        # 80x25(col*row)
+ 
+-	mov	ah,#0x88
+-	int	0x15
+-	mov	[2],ax
++# check for EGA/VGA and some config parameters
++    mov $INITSEG, %ax
++    mov %ax, %ds
++	mov	$0x12, %ah
++	mov	$0x10, %bl
++	int	$0x10
++	mov	%ax, %ds:8      # ???
++	mov	%bx, %ds:10     # bh = video mode bl = video memory size(256KB)
++	mov	%cx, %ds:12     # EGA 80x25
+ 
+-! check for EGA/VGA and some config parameters
++    mov $0x5019, %ax    # 80x25
++    mov %ax, %ds:14
+ 
+-	mov	ah,#0x12
+-	mov	bl,#0x10
+-	int	0x10
+-	mov	[8],ax
+-	mov	[10],bx
+-	mov	[12],cx
+-	mov	ax,#0x5019
+-	cmp	bl,#0x10
+-	je	novga
+-	call	chsvga
+-novga:	mov	[14],ax
+-	mov	ah,#0x03	! read cursor pos
+-	xor	bh,bh
+-	int	0x10		! save it in known place, con_init fetches
+-	mov	[0],dx		! it from 0x90000.
+-	
+-! Get video-card data:
+-	
+-	mov	ah,#0x0f
+-	int	0x10
+-	mov	[4],bx		! bh = display page
+-	mov	[6],ax		! al = video mode, ah = window width
++# Get hd0 data(fixed disk parameter table)
+ 
+-! Get hd0 data
+-
+-	mov	ax,#0x0000
+-	mov	ds,ax
+-	lds	si,[4*0x41]
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	di,#0x0080
+-	mov	cx,#0x10
++	mov	$0x0000, %ax
++	mov	%ax, %ds
++	lds	%ds:4*0x41, %si # src
++	mov	$INITSEG, %ax
++	mov	%ax, %es
++	mov	$0x0080, %di    # dst: 0x90080
++	mov	$0x10, %cx      # the size of FDPT is 16)
+ 	rep
+ 	movsb
+ 
+-! Get hd1 data
++# Get hd1 data
+ 
+-	mov	ax,#0x0000
+-	mov	ds,ax
+-	lds	si,[4*0x46]
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	di,#0x0090
+-	mov	cx,#0x10
++	mov	$0x0000, %ax
++	mov	%ax, %ds
++	lds	%ds:4*0x46, %si #
++	mov	$INITSEG, %ax
++	mov	%ax, %es
++	mov	$0x0090, %di
++	mov	$0x10, %cx
+ 	rep
+ 	movsb
+ 
+-! Check that there IS a hd1 :-)
++## modify ds
++	mov $INITSEG,%ax
++	mov %ax,%ds
++	mov $SETUPSEG,%ax
++	mov %ax,%es
+ 
+-	mov	ax,#0x01500
+-	mov	dl,#0x81
+-	int	0x13
++##show cursor pos:
++	mov $0x03, %ah 
++	xor %bh,%bh
++	int $0x10
++	mov $11,%cx
++	mov $0x000a,%bx
++	mov $cur,%bp
++	mov $0x1301,%ax
++	int $0x10
++##show detail(row*col)
++	mov %ds:0 ,%ax
++	call print_hex
++	call print_nl
++
++##show memory size
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $12, %cx
++	mov $0x000a, %bx
++	mov $mem, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail(KB)
++	mov %ds:2 , %ax
++	call print_hex
++
++##show nr of cylinders
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $25, %cx
++	mov $0x000a, %bx
++	mov $cyl, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail
++	mov %ds:0x80, %ax
++	call print_hex
++	call print_nl
++
++##show nr of heads
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $9, %cx
++	mov $0x000a, %bx
++	mov $head, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail
++	mov %ds:0x82, %ax
++	call print_hex
++	call print_nl
++
++##show nr of sectors per track 
++	mov $0x03, %ah
++	xor %bh, %bh
++	int $0x10
++	mov $9, %cx
++	mov $0x000a, %bx
++	mov $sect, %bp
++	mov $0x1301, %ax
++	int $0x10
++##show detail
++	mov %ds:0x8e, %ax
++	call print_hex
++	call print_nl
++
++# Check that there IS a hd1 :-)
++
++	mov	$0x01500, %ax
++	mov	$0x81, %dl
++	int	$0x13
+ 	jc	no_disk1
+-	cmp	ah,#3
++	cmp	$3, %ah
+ 	je	is_disk1
+ no_disk1:
+-	mov	ax,#INITSEG
+-	mov	es,ax
+-	mov	di,#0x0090
+-	mov	cx,#0x10
+-	mov	ax,#0x00
+-	rep
++	mov	$INITSEG, %ax
++	mov	%ax, %es
++	mov	$0x0090, %di
++	mov	$0x10, %cx
++	mov	$0x00, %ax
++	rep             # clear       
+ 	stosb
+ is_disk1:
+ 
+-! now we want to move to protected mode ...
++# now we want to move to protected mode ...
+ 
+-	cli			! no interrupts allowed !
++	cli			    # no interrupts allowed ! 
+ 
+-! first we move the system to it's rightful place
++# first we move the system to its rightful place(load kernel module)
+ 
+-	mov	ax,#0x0000
+-	cld			! 'direction'=0, movs moves forward
++	mov	$0x0000, %ax
++	cld			    # 'direction'=0, movs moves forward
+ do_move:
+-	mov	es,ax		! destination segment
+-	add	ax,#0x1000
+-	cmp	ax,#0x9000
++	mov	%ax, %es	# destination segment
++	add	$0x1000, %ax
++	cmp	$0x9000, %ax # 0x9000 SYS_SIZE 
+ 	jz	end_move
+-	mov	ds,ax		! source segment
+-	sub	di,di
+-	sub	si,si
+-	mov 	cx,#0x8000
++	mov	%ax, %ds	# source segment
++	sub	%di, %di
++	sub	%si, %si
++	mov $0x8000, %cx
+ 	rep
+ 	movsw
+ 	jmp	do_move
+ 
+-! then we load the segment descriptors
++# then we load the segment descriptors
+ 
+ end_move:
+-	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
+-	mov	ds,ax
+-	lidt	idt_48		! load idt with 0,0
+-	lgdt	gdt_48		! load gdt with whatever appropriate
++	mov	$SETUPSEG, %ax	# right, forgot this at first. didn't work :-)
++	mov	%ax, %ds        # 0x9020
++	lidt idt_48		    # load idt with 0,0
++	lgdt gdt_48		    # load gdt with whatever appropriate
+ 
+-! that was painless, now we enable A20
++# that was painless, now we enable A20
+ 
+-	call	empty_8042
+-	mov	al,#0xD1		! command write
+-	out	#0x64,al
+-	call	empty_8042
+-	mov	al,#0xDF		! A20 on
+-	out	#0x60,al
+-	call	empty_8042
++	inb     $0x92, %al	# open A20 line(Fast Gate A20).
++	orb     $0b00000010, %al
++	outb    %al, $0x92
+ 
+-! well, that went ok, I hope. Now we have to reprogram the interrupts :-(
+-! we put them right after the intel-reserved hardware interrupts, at
+-! int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
+-! messed this up with the original PC, and they haven't been able to
+-! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
+-! which is used for the internal hardware interrupts as well. We just
+-! have to reprogram the 8259's, and it isn't fun.
++# well, that went ok, I hope. Now we have to reprogram the interrupts :-(
++# we put them right after the intel-reserved hardware interrupts, at
++# int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
++# messed this up with the original PC, and they haven't been able to
++# rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
++# which is used for the internal hardware interrupts as well. We just
++# have to reprogram the 8259's, and it isn't fun.
+ 
+-	mov	al,#0x11		! initialization sequence
+-	out	#0x20,al		! send it to 8259A-1
+-	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
+-	out	#0xA0,al		! and to 8259A-2
++	mov	$0x11, %al		# initialization sequence(ICW1)
++					    # ICW4 needed(1),CASCADE mode,Level-triggered
++	out	%al, $0x20		# send it to 8259A-1
++	.word   0x00eb,0x00eb		# jmp $+2, jmp $+2
++	out	%al, $0xA0		# and to 8259A-2
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x20		! start of hardware int's (0x20)
+-	out	#0x21,al
++	mov	$0x20, %al		# start of hardware int's (0x20)(ICW2)
++	out	%al, $0x21		# from 0x20-0x27
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x28		! start of hardware int's 2 (0x28)
+-	out	#0xA1,al
++	mov	$0x28, %al		# start of hardware int's 2 (0x28)
++	out	%al, $0xA1		# from 0x28-0x2F
++	.word	0x00eb,0x00eb		# IR 7654 3210
++	mov	$0x04, %al		# 8259-1 is master(0000 0100)
++	out	%al, $0x21		# 
++	.word	0x00eb,0x00eb		# INT
++	mov	$0x02, %al		# 8259-2 is slave(010 --> 2)
++	out	%al, $0xA1
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x04		! 8259-1 is master
+-	out	#0x21,al
++	mov	$0x01, %al		# 8086 mode for both
++	out	%al, $0x21
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x02		! 8259-2 is slave
+-	out	#0xA1,al
++	out	%al, $0xA1
+ 	.word	0x00eb,0x00eb
+-	mov	al,#0x01		! 8086 mode for both
+-	out	#0x21,al
++	mov	$0xFF, %al		# mask off all interrupts for now
++	out	%al, $0x21
+ 	.word	0x00eb,0x00eb
+-	out	#0xA1,al
+-	.word	0x00eb,0x00eb
+-	mov	al,#0xFF		! mask off all interrupts for now
+-	out	#0x21,al
+-	.word	0x00eb,0x00eb
+-	out	#0xA1,al
++	out	%al, $0xA1
+ 
+-! well, that certainly wasn't fun :-(. Hopefully it works, and we don't
+-! need no steenking BIOS anyway (except for the initial loading :-).
+-! The BIOS-routine wants lots of unnecessary data, and it's less
+-! "interesting" anyway. This is how REAL programmers do it.
+-!
+-! Well, now's the time to actually move into protected mode. To make
+-! things as simple as possible, we do no register set-up or anything,
+-! we let the gnu-compiled 32-bit programs do that. We just jump to
+-! absolute address 0x00000, in 32-bit protected mode.
++# well, that certainly wasn't fun :-(. Hopefully it works, and we don't
++# need no steenking BIOS anyway (except for the initial loading :-).
++# The BIOS-routine wants lots of unnecessary data, and it's less
++# "interesting" anyway. This is how REAL programmers do it.
++#
++# Well, now's the time to actually move into protected mode. To make
++# things as simple as possible, we do no register set-up or anything,
++# we let the gnu-compiled 32-bit programs do that. We just jump to
++# absolute address 0x00000, in 32-bit protected mode.
++	mov	%cr0, %eax	# get machine status(cr0|MSW)	
++	bts	$0, %eax	# turn on the PE-bit 
++	mov	%eax, %cr0	# protection enabled
++				
++				            # segment-descriptor        (INDEX:TI:RPL)
++	.equ	sel_cs0, 0x0008 # select for code segment 0 (  001:0 :00) 
++	ljmp	$sel_cs0, $0	# jmp offset 0 of code segment 0 in gdt
+ 
+-	mov	ax,#0x0001	! protected mode (PE) bit
+-	lmsw	ax		! This is it!
+-	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+-
+-! This routine checks that the keyboard command queue is empty
+-! No timeout is used - if this hangs there is something wrong with
+-! the machine, and we probably couldn't proceed anyway.
+-empty_8042:
+-	.word	0x00eb,0x00eb
+-	in	al,#0x64	! 8042 status port
+-	test	al,#2		! is input buffer full?
+-	jnz	empty_8042	! yes - loop
+-	ret
+-
+-! Routine trying to recognize type of SVGA-board present (if any)
+-! and if it recognize one gives the choices of resolution it offers.
+-! If one is found the resolution chosen is given by al,ah (rows,cols).
+-
+-chsvga:	cld
+-	push	ds
+-	push	cs
+-	pop	ds
+-	mov 	ax,#0xc000
+-	mov	es,ax
+-	lea	si,msg1
+-	call	prtstr
+-nokey:	in	al,#0x60
+-	cmp	al,#0x82
+-	jb	nokey
+-	cmp	al,#0xe0
+-	ja	nokey
+-	cmp	al,#0x9c
+-	je	svga
+-	mov	ax,#0x5019
+-	pop	ds
+-	ret
+-svga:	lea 	si,idati		! Check ATI 'clues'
+-	mov	di,#0x31
+-	mov 	cx,#0x09
+-	repe
+-	cmpsb
+-	jne	noati
+-	lea	si,dscati
+-	lea	di,moati
+-	lea	cx,selmod
+-	jmp	cx
+-noati:	mov	ax,#0x200f		! Check Ahead 'clues'
+-	mov	dx,#0x3ce
+-	out	dx,ax
+-	inc	dx
+-	in	al,dx
+-	cmp	al,#0x20
+-	je	isahed
+-	cmp	al,#0x21
+-	jne	noahed
+-isahed:	lea	si,dscahead
+-	lea	di,moahead
+-	lea	cx,selmod
+-	jmp	cx
+-noahed:	mov	dx,#0x3c3		! Check Chips & Tech. 'clues'
+-	in	al,dx
+-	or	al,#0x10
+-	out	dx,al
+-	mov	dx,#0x104		
+-	in	al,dx
+-	mov	bl,al
+-	mov	dx,#0x3c3
+-	in	al,dx
+-	and	al,#0xef
+-	out	dx,al
+-	cmp	bl,[idcandt]
+-	jne	nocant
+-	lea	si,dsccandt
+-	lea	di,mocandt
+-	lea	cx,selmod
+-	jmp	cx
+-nocant:	mov	dx,#0x3d4		! Check Cirrus 'clues'
+-	mov	al,#0x0c
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bl,al
+-	xor	al,al
+-	out	dx,al
+-	dec	dx
+-	mov	al,#0x1f
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bh,al
+-	xor	ah,ah
+-	shl	al,#4
+-	mov	cx,ax
+-	mov	al,bh
+-	shr	al,#4
+-	add	cx,ax
+-	shl	cx,#8
+-	add	cx,#6
+-	mov	ax,cx
+-	mov	dx,#0x3c4
+-	out	dx,ax
+-	inc	dx
+-	in	al,dx
+-	and	al,al
+-	jnz	nocirr
+-	mov	al,bh
+-	out	dx,al
+-	in	al,dx
+-	cmp	al,#0x01
+-	jne	nocirr
+-	call	rst3d4	
+-	lea	si,dsccirrus
+-	lea	di,mocirrus
+-	lea	cx,selmod
+-	jmp	cx
+-rst3d4:	mov	dx,#0x3d4
+-	mov	al,bl
+-	xor	ah,ah
+-	shl	ax,#8
+-	add	ax,#0x0c
+-	out	dx,ax
+-	ret	
+-nocirr:	call	rst3d4			! Check Everex 'clues'
+-	mov	ax,#0x7000
+-	xor	bx,bx
+-	int	0x10
+-	cmp	al,#0x70
+-	jne	noevrx
+-	shr	dx,#4
+-	cmp	dx,#0x678
+-	je	istrid
+-	cmp	dx,#0x236
+-	je	istrid
+-	lea	si,dsceverex
+-	lea	di,moeverex
+-	lea	cx,selmod
+-	jmp	cx
+-istrid:	lea	cx,ev2tri
+-	jmp	cx
+-noevrx:	lea	si,idgenoa		! Check Genoa 'clues'
+-	xor 	ax,ax
+-	seg es
+-	mov	al,[0x37]
+-	mov	di,ax
+-	mov	cx,#0x04
+-	dec	si
+-	dec	di
+-l1:	inc	si
+-	inc	di
+-	mov	al,(si)
+-	seg es
+-	and	al,(di)
+-	cmp	al,(si)
+-	loope 	l1
+-	cmp	cx,#0x00
+-	jne	nogen
+-	lea	si,dscgenoa
+-	lea	di,mogenoa
+-	lea	cx,selmod
+-	jmp	cx
+-nogen:	lea	si,idparadise		! Check Paradise 'clues'
+-	mov	di,#0x7d
+-	mov	cx,#0x04
+-	repe
+-	cmpsb
+-	jne	nopara
+-	lea	si,dscparadise
+-	lea	di,moparadise
+-	lea	cx,selmod
+-	jmp	cx
+-nopara:	mov	dx,#0x3c4		! Check Trident 'clues'
+-	mov	al,#0x0e
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	xchg	ah,al
+-	mov	al,#0x00
+-	out	dx,al
+-	in	al,dx
+-	xchg	al,ah
+-	mov	bl,al		! Strange thing ... in the book this wasn't
+-	and	bl,#0x02	! necessary but it worked on my card which
+-	jz	setb2		! is a trident. Without it the screen goes
+-	and	al,#0xfd	! blurred ...
+-	jmp	clrb2		!
+-setb2:	or	al,#0x02	!
+-clrb2:	out	dx,al
+-	and	ah,#0x0f
+-	cmp	ah,#0x02
+-	jne	notrid
+-ev2tri:	lea	si,dsctrident
+-	lea	di,motrident
+-	lea	cx,selmod
+-	jmp	cx
+-notrid:	mov	dx,#0x3cd		! Check Tseng 'clues'
+-	in	al,dx			! Could things be this simple ! :-)
+-	mov	bl,al
+-	mov	al,#0x55
+-	out	dx,al
+-	in	al,dx
+-	mov	ah,al
+-	mov	al,bl
+-	out	dx,al
+-	cmp	ah,#0x55
+- 	jne	notsen
+-	lea	si,dsctseng
+-	lea	di,motseng
+-	lea	cx,selmod
+-	jmp	cx
+-notsen:	mov	dx,#0x3cc		! Check Video7 'clues'
+-	in	al,dx
+-	mov	dx,#0x3b4
+-	and	al,#0x01
+-	jz	even7
+-	mov	dx,#0x3d4
+-even7:	mov	al,#0x0c
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bl,al
+-	mov	al,#0x55
+-	out	dx,al
+-	in	al,dx
+-	dec	dx
+-	mov	al,#0x1f
+-	out	dx,al
+-	inc	dx
+-	in	al,dx
+-	mov	bh,al
+-	dec	dx
+-	mov	al,#0x0c
+-	out	dx,al
+-	inc	dx
+-	mov	al,bl
+-	out	dx,al
+-	mov	al,#0x55
+-	xor	al,#0xea
+-	cmp	al,bh
+-	jne	novid7
+-	lea	si,dscvideo7
+-	lea	di,movideo7
+-selmod:	push	si
+-	lea	si,msg2
+-	call	prtstr
+-	xor	cx,cx
+-	mov	cl,(di)
+-	pop	si
+-	push	si
+-	push	cx
+-tbl:	pop	bx
+-	push	bx
+-	mov	al,bl
+-	sub	al,cl
+-	call	dprnt
+-	call	spcing
+-	lodsw
+-	xchg	al,ah
+-	call	dprnt
+-	xchg	ah,al
+-	push	ax
+-	mov	al,#0x78
+-	call	prnt1
+-	pop	ax
+-	call	dprnt
+-	call	docr
+-	loop	tbl
+-	pop	cx
+-	call	docr
+-	lea	si,msg3
+-	call	prtstr
+-	pop	si
+-	add	cl,#0x80
+-nonum:	in	al,#0x60	! Quick and dirty...
+-	cmp	al,#0x82
+-	jb	nonum
+-	cmp	al,#0x8b
+-	je	zero
+-	cmp	al,cl
+-	ja	nonum
+-	jmp	nozero
+-zero:	sub	al,#0x0a
+-nozero:	sub	al,#0x80
+-	dec	al
+-	xor	ah,ah
+-	add	di,ax
+-	inc	di
+-	push	ax
+-	mov	al,(di)
+-	int 	0x10
+-	pop	ax
+-	shl	ax,#1
+-	add	si,ax
+-	lodsw
+-	pop	ds
+-	ret
+-novid7:	pop	ds	! Here could be code to support standard 80x50,80x30
+-	mov	ax,#0x5019	
+-	ret
+-
+-! Routine that 'tabs' to next col.
+-
+-spcing:	mov	al,#0x2e
+-	call	prnt1
+-	mov	al,#0x20
+-	call	prnt1	
+-	mov	al,#0x20
+-	call	prnt1	
+-	mov	al,#0x20
+-	call	prnt1	
+-	mov	al,#0x20
+-	call	prnt1
+-	ret	
+-
+-! Routine to print asciiz-string at DS:SI
+-
+-prtstr:	lodsb
+-	and	al,al
+-	jz	fin
+-	call	prnt1
+-	jmp	prtstr
+-fin:	ret
+-
+-! Routine to print a decimal value on screen, the value to be
+-! printed is put in al (i.e 0-255). 
+-
+-dprnt:	push	ax
+-	push	cx
+-	mov	ah,#0x00		
+-	mov	cl,#0x0a
+-	idiv	cl
+-	cmp	al,#0x09
+-	jbe	lt100
+-	call	dprnt
+-	jmp	skip10
+-lt100:	add	al,#0x30
+-	call	prnt1
+-skip10:	mov	al,ah
+-	add	al,#0x30
+-	call	prnt1	
+-	pop	cx
+-	pop	ax
+-	ret
+-
+-! Part of above routine, this one just prints ascii al
+-
+-prnt1:	push	ax
+-	push	cx
+-	mov	bh,#0x00
+-	mov	cx,#0x01
+-	mov	ah,#0x0e
+-	int	0x10
+-	pop	cx
+-	pop	ax
+-	ret
+-
+-! Prints <CR> + <LF>
+-
+-docr:	push	ax
+-	push	cx
+-	mov	bh,#0x00
+-	mov	ah,#0x0e
+-	mov	al,#0x0a
+-	mov	cx,#0x01
+-	int	0x10
+-	mov	al,#0x0d
+-	int	0x10
+-	pop	cx
+-	pop	ax
+-	ret	
+-	
+ gdt:
+-	.word	0,0,0,0		! dummy
++	.word	0,0,0,0		# dummy
+ 
+-	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
+-	.word	0x0000		! base address=0
+-	.word	0x9A00		! code read/exec
+-	.word	0x00C0		! granularity=4096, 386
++	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
++	.word	0x0000		# base address=0
++	.word	0x9A00		# code read/exec
++	.word	0x00C0		# granularity=4096, 386
+ 
+-	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
+-	.word	0x0000		! base address=0
+-	.word	0x9200		! data read/write
+-	.word	0x00C0		! granularity=4096, 386
++	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
++	.word	0x0000		# base address=0
++	.word	0x9200		# data read/write
++	.word	0x00C0		# granularity=4096, 386
+ 
+ idt_48:
+-	.word	0			! idt limit=0
+-	.word	0,0			! idt base=0L
++	.word	0			# idt limit=0
++	.word	0,0			# idt base=0L
+ 
+ gdt_48:
+-	.word	0x800		! gdt limit=2048, 256 GDT entries
+-	.word	512+gdt,0x9	! gdt base = 0X9xxxx
++	.word	0x800			    # gdt limit=2048, 256 GDT entries
++	.word   512+gdt, 0x9		# gdt base = 0X9xxxx, 
++	# 512+gdt is the real gdt after setup is moved to 0x9020 * 0x10
+ 
+-msg1:		.ascii	"Press <RETURN> to see SVGA-modes available or any other key to continue."
+-		db	0x0d, 0x0a, 0x0a, 0x00
+-msg2:		.ascii	"Mode:  COLSxROWS:"
+-		db	0x0d, 0x0a, 0x0a, 0x00
+-msg3:		.ascii	"Choose mode by pressing the corresponding number."
+-		db	0x0d, 0x0a, 0x00
+-		
+-idati:		.ascii	"761295520"
+-idcandt:	.byte	0xa5
+-idgenoa:	.byte	0x77, 0x00, 0x66, 0x99
+-idparadise:	.ascii	"VGA="
++# print_hex()
++print_hex:
++	mov $4,%cx
++	mov %ax,%dx
++print_digit:
++	rol $4,%dx	    #循环以使低4位用上，高4位移至低4位
++	mov $0xe0f,%ax  #ah ＝ 请求的功能值，al = 半个字节的掩码
++	and %dl,%al
++	add $0x30,%al
++	cmp $0x3a,%al
++	jl outp
++	add $0x07,%al
++outp:
++	int $0x10
++	loop print_digit
++	ret
++#打印回车换行
++print_nl:
++	mov $0xe0d,%ax
++	int $0x10
++	mov $0xa,%al
++	int $0x10
++	ret
+ 
+-! Manufacturer:	  Numofmodes:	Mode:
+-
+-moati:		.byte	0x02,	0x23, 0x33 
+-moahead:	.byte	0x05,	0x22, 0x23, 0x24, 0x2f, 0x34
+-mocandt:	.byte	0x02,	0x60, 0x61
+-mocirrus:	.byte	0x04,	0x1f, 0x20, 0x22, 0x31
+-moeverex:	.byte	0x0a,	0x03, 0x04, 0x07, 0x08, 0x0a, 0x0b, 0x16, 0x18, 0x21, 0x40
+-mogenoa:	.byte	0x0a,	0x58, 0x5a, 0x60, 0x61, 0x62, 0x63, 0x64, 0x72, 0x74, 0x78
+-moparadise:	.byte	0x02,	0x55, 0x54
+-motrident:	.byte	0x07,	0x50, 0x51, 0x52, 0x57, 0x58, 0x59, 0x5a
+-motseng:	.byte	0x05,	0x26, 0x2a, 0x23, 0x24, 0x22
+-movideo7:	.byte	0x06,	0x40, 0x43, 0x44, 0x41, 0x42, 0x45
+-
+-!			msb = Cols lsb = Rows:
+-
+-dscati:		.word	0x8419, 0x842c
+-dscahead:	.word	0x842c, 0x8419, 0x841c, 0xa032, 0x5042
+-dsccandt:	.word	0x8419, 0x8432
+-dsccirrus:	.word	0x8419, 0x842c, 0x841e, 0x6425
+-dsceverex:	.word	0x5022, 0x503c, 0x642b, 0x644b, 0x8419, 0x842c, 0x501e, 0x641b, 0xa040, 0x841e
+-dscgenoa:	.word	0x5020, 0x642a, 0x8419, 0x841d, 0x8420, 0x842c, 0x843c, 0x503c, 0x5042, 0x644b
+-dscparadise:	.word	0x8419, 0x842b
+-dsctrident:	.word 	0x501e, 0x502b, 0x503c, 0x8419, 0x841e, 0x842b, 0x843c
+-dsctseng:	.word	0x503c, 0x6428, 0x8419, 0x841c, 0x842c
+-dscvideo7:	.word	0x502b, 0x503c, 0x643c, 0x8419, 0x842c, 0x841c
+-	
++msg2:
++	.byte 13,10
++	.ascii "Now we are in setup ..."
++	.byte 13,10
++cur:
++	.ascii "Cursor POS:"
++mem:
++	.ascii "Memory SIZE:"
++cyl:
++	.ascii "KB"
++	.byte 13,10
++	.ascii "HD Info:"
++	.byte 13,10
++	.ascii " Cylinders:"
++head:
++	.ascii " Headers:"
++sect:
++	.ascii " Secotrs:"
+ .text
+ endtext:
+ .data
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/Makefile patch-new/linux-0.12/fs/Makefile
+--- patch-old/linux-0.12/fs/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/fs/Makefile	2026-04-04 13:12:07
+@@ -1,16 +1,14 @@
+-AR	=gar
+-AS	=gas
+-CC	=gcc
+-LD	=gld
+-CFLAGS	=-Wall -O -fstrength-reduce -fcombine-regs -fomit-frame-pointer \
+-	-fno-defer-pop -mstring-insns -nostdinc -I../include
+-CPP	=gcc -E -nostdinc -I../include
++include ../Makefile.header
+ 
++LDFLAGS += -r
++CFLAGS	+= -I../include
++CPP	+= -I../include
++
+ .c.s:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-S -o $*.s $<
+ .c.o:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-c -o $*.o $<
+ .s.o:
+ 	$(AS) -o $*.o $<
+@@ -20,110 +18,81 @@
+ 	bitmap.o fcntl.o ioctl.o truncate.o select.o
+ 
+ fs.o: $(OBJS)
+-	$(LD) -r -o fs.o $(OBJS)
++	@$(LD) $(LDFLAGS) -o fs.o $(OBJS)
+ 
+ clean:
+-	rm -f core *.o *.a tmp_make
+-	for i in *.c;do rm -f `basename $$i .c`.s;done
++	@rm -f core *.o *.a tmp_make
++	@for i in *.c;do rm -f `basename $$i .c`.s;done
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in *.c;do $(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in *.c;do $(CPP) -M $$i;done) >> tmp_make
++	@cp tmp_make Makefile
+ 
+ ### Dependencies:
+-bitmap.o : bitmap.c ../include/string.h ../include/linux/sched.h \
++bitmap.o: bitmap.c ../include/string.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h 
+-block_dev.o : block_dev.c ../include/errno.h ../include/linux/sched.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/kernel.h
++block_dev.o: block_dev.c ../include/errno.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/asm/segment.h ../include/asm/system.h 
+-buffer.o : buffer.c ../include/stdarg.h ../include/linux/config.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/kernel.h \
++  ../include/asm/segment.h ../include/asm/system.h
++buffer.o: buffer.c ../include/stdarg.h ../include/linux/config.h \
+   ../include/linux/sched.h ../include/linux/head.h ../include/linux/fs.h \
+-  ../include/sys/types.h ../include/linux/mm.h ../include/linux/kernel.h \
+-  ../include/signal.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/system.h \
+-  ../include/asm/io.h 
+-char_dev.o : char_dev.c ../include/errno.h ../include/sys/types.h \
++  ../include/sys/types.h ../include/linux/mm.h ../include/signal.h \
++  ../include/linux/kernel.h ../include/asm/system.h ../include/asm/io.h
++char_dev.o: char_dev.c ../include/errno.h ../include/sys/types.h \
+   ../include/linux/sched.h ../include/linux/head.h ../include/linux/fs.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/asm/segment.h ../include/asm/io.h 
+-exec.o : exec.c ../include/signal.h ../include/sys/types.h \
+-  ../include/errno.h ../include/string.h ../include/sys/stat.h \
+-  ../include/a.out.h ../include/linux/fs.h ../include/linux/sched.h \
+-  ../include/linux/head.h ../include/linux/mm.h ../include/linux/kernel.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/asm/segment.h 
+-fcntl.o : fcntl.c ../include/string.h ../include/errno.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/kernel.h \
++  ../include/asm/segment.h ../include/asm/io.h
++exec.o: exec.c ../include/errno.h ../include/string.h \
++  ../include/sys/stat.h ../include/sys/types.h ../include/a.out.h \
++  ../include/linux/fs.h ../include/linux/sched.h ../include/linux/head.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/kernel.h \
++  ../include/asm/segment.h
++fcntl.o: fcntl.c ../include/string.h ../include/errno.h \
+   ../include/linux/sched.h ../include/linux/head.h ../include/linux/fs.h \
+-  ../include/sys/types.h ../include/linux/mm.h ../include/linux/kernel.h \
+-  ../include/signal.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/segment.h \
+-  ../include/fcntl.h ../include/sys/stat.h 
+-file_dev.o : file_dev.c ../include/errno.h ../include/fcntl.h \
++  ../include/sys/types.h ../include/linux/mm.h ../include/signal.h \
++  ../include/linux/kernel.h ../include/asm/segment.h ../include/fcntl.h \
++  ../include/sys/stat.h
++file_dev.o: file_dev.c ../include/errno.h ../include/fcntl.h \
+   ../include/sys/types.h ../include/linux/sched.h ../include/linux/head.h \
+-  ../include/linux/fs.h ../include/linux/mm.h ../include/linux/kernel.h \
+-  ../include/signal.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/segment.h 
+-file_table.o : file_table.c ../include/linux/fs.h ../include/sys/types.h 
+-inode.o : inode.c ../include/string.h ../include/sys/stat.h \
++  ../include/linux/fs.h ../include/linux/mm.h ../include/signal.h \
++  ../include/linux/kernel.h ../include/asm/segment.h
++file_table.o: file_table.c ../include/linux/fs.h ../include/sys/types.h
++inode.o: inode.c ../include/string.h ../include/sys/stat.h \
+   ../include/sys/types.h ../include/linux/sched.h ../include/linux/head.h \
+-  ../include/linux/fs.h ../include/linux/mm.h ../include/linux/kernel.h \
+-  ../include/signal.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/system.h 
+-ioctl.o : ioctl.c ../include/string.h ../include/errno.h \
++  ../include/linux/fs.h ../include/linux/mm.h ../include/signal.h \
++  ../include/linux/kernel.h ../include/asm/system.h
++ioctl.o: ioctl.c ../include/string.h ../include/errno.h \
+   ../include/sys/stat.h ../include/sys/types.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/linux/mm.h \
+-  ../include/linux/kernel.h ../include/signal.h ../include/sys/param.h \
+-  ../include/sys/time.h ../include/time.h ../include/sys/resource.h 
+-namei.o : namei.c ../include/linux/sched.h ../include/linux/head.h \
++  ../include/signal.h
++namei.o: namei.c ../include/linux/sched.h ../include/linux/head.h \
+   ../include/linux/fs.h ../include/sys/types.h ../include/linux/mm.h \
+-  ../include/linux/kernel.h ../include/signal.h ../include/sys/param.h \
+-  ../include/sys/time.h ../include/time.h ../include/sys/resource.h \
+-  ../include/asm/segment.h ../include/string.h ../include/fcntl.h \
+-  ../include/errno.h ../include/const.h ../include/sys/stat.h 
+-open.o : open.c ../include/string.h ../include/errno.h ../include/fcntl.h \
++  ../include/signal.h ../include/linux/kernel.h ../include/asm/segment.h \
++  ../include/string.h ../include/fcntl.h ../include/errno.h \
++  ../include/const.h ../include/sys/stat.h
++open.o: open.c ../include/string.h ../include/errno.h ../include/fcntl.h \
+   ../include/sys/types.h ../include/utime.h ../include/sys/stat.h \
+   ../include/linux/sched.h ../include/linux/head.h ../include/linux/fs.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/linux/tty.h ../include/termios.h \
+-  ../include/asm/segment.h 
+-pipe.o : pipe.c ../include/signal.h ../include/sys/types.h \
+-  ../include/errno.h ../include/termios.h ../include/linux/sched.h \
+-  ../include/linux/head.h ../include/linux/fs.h ../include/linux/mm.h \
+-  ../include/linux/kernel.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/segment.h 
+-read_write.o : read_write.c ../include/sys/stat.h ../include/sys/types.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/tty.h \
++  ../include/termios.h ../include/linux/kernel.h ../include/asm/segment.h
++pipe.o: pipe.c ../include/signal.h ../include/sys/types.h \
++  ../include/linux/sched.h ../include/linux/head.h ../include/linux/fs.h \
++  ../include/linux/mm.h ../include/asm/segment.h
++read_write.o: read_write.c ../include/sys/stat.h ../include/sys/types.h \
+   ../include/errno.h ../include/linux/kernel.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/linux/mm.h \
+-  ../include/signal.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/segment.h 
+-select.o : select.c ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/kernel.h ../include/linux/tty.h ../include/termios.h \
+-  ../include/linux/sched.h ../include/linux/head.h ../include/linux/mm.h \
+-  ../include/signal.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/segment.h \
+-  ../include/asm/system.h ../include/sys/stat.h ../include/string.h \
+-  ../include/const.h ../include/errno.h 
+-stat.o : stat.c ../include/errno.h ../include/sys/stat.h \
++  ../include/signal.h ../include/asm/segment.h
++stat.o: stat.c ../include/errno.h ../include/sys/stat.h \
+   ../include/sys/types.h ../include/linux/fs.h ../include/linux/sched.h \
+-  ../include/linux/head.h ../include/linux/mm.h ../include/linux/kernel.h \
+-  ../include/signal.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/asm/segment.h 
+-super.o : super.c ../include/linux/config.h ../include/linux/sched.h \
++  ../include/linux/head.h ../include/linux/mm.h ../include/signal.h \
++  ../include/linux/kernel.h ../include/asm/segment.h
++super.o: super.c ../include/linux/config.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/asm/system.h ../include/errno.h \
+-  ../include/sys/stat.h 
+-truncate.o : truncate.c ../include/linux/sched.h ../include/linux/head.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/kernel.h \
++  ../include/asm/system.h ../include/errno.h ../include/sys/stat.h
++truncate.o: truncate.c ../include/linux/sched.h ../include/linux/head.h \
+   ../include/linux/fs.h ../include/sys/types.h ../include/linux/mm.h \
+-  ../include/linux/kernel.h ../include/signal.h ../include/sys/param.h \
+-  ../include/sys/time.h ../include/time.h ../include/sys/resource.h \
+-  ../include/sys/stat.h 
++  ../include/signal.h ../include/sys/stat.h
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/bitmap.c patch-new/linux-0.12/fs/bitmap.c
+--- patch-old/linux-0.12/fs/bitmap.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/fs/bitmap.c	2026-04-04 13:12:07
+@@ -14,7 +14,7 @@
+ __asm__("cld\n\t" \
+ 	"rep\n\t" \
+ 	"stosl" \
+-	::"a" (0),"c" (BLOCK_SIZE/4),"D" ((long) (addr)):"cx","di")
++	::"a" (0),"c" (BLOCK_SIZE/4),"D" ((long) (addr)))
+ 
+ #define set_bit(nr,addr) ({\
+ register int res __asm__("ax"); \
+@@ -41,7 +41,7 @@
+ 	"cmpl $8192,%%ecx\n\t" \
+ 	"jl 1b\n" \
+ 	"3:" \
+-	:"=c" (__res):"c" (0),"S" (addr):"ax","dx","si"); \
++	:"=c" (__res):"c" (0),"S" (addr)); \
+ __res;})
+ 
+ int free_block(int dev, int block)
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/buffer.c patch-new/linux-0.12/fs/buffer.c
+--- patch-old/linux-0.12/fs/buffer.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/fs/buffer.c	2026-04-04 13:12:07
+@@ -285,7 +285,7 @@
+ 	"rep\n\t" \
+ 	"movsl\n\t" \
+ 	::"c" (BLOCK_SIZE/4),"S" (from),"D" (to) \
+-	:"cx","di","si")
++	)
+ 
+ /*
+  * bread_page reads four buffers into memory at the desired address. It's
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/exec.c patch-new/linux-0.12/fs/exec.c
+--- patch-old/linux-0.12/fs/exec.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/fs/exec.c	2026-04-04 13:12:07
+@@ -159,8 +159,7 @@
+ 				if (from_kmem==2)
+ 					set_fs(old_fs);
+ 				if (!(pag = (char *) page[p/PAGE_SIZE]) &&
+-				    !(pag = (char *) page[p/PAGE_SIZE] =
+-				      (unsigned long *) get_free_page())) 
++				    !(pag = (char *) (page[p/PAGE_SIZE] = get_free_page()))) 
+ 					return 0;
+ 				if (from_kmem==2)
+ 					set_fs(new_fs);
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/namei.c patch-new/linux-0.12/fs/namei.c
+--- patch-old/linux-0.12/fs/namei.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/fs/namei.c	2026-04-04 13:12:07
+@@ -79,7 +79,7 @@
+ 		"setz %%al"
+ 		:"=a" (same)
+ 		:"0" (0),"S" ((long) name),"D" ((long) de->name),"c" (len)
+-		:"cx","di","si");
++		);
+ 	return same;
+ }
+ 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/io.h patch-new/linux-0.12/include/asm/io.h
+--- patch-old/linux-0.12/include/asm/io.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/asm/io.h	2026-04-04 13:12:07
+@@ -9,11 +9,12 @@
+ })
+ 
+ #define outb_p(value,port) \
+-__asm__ ("outb %%al,%%dx\n" \
++__asm__  volatile ("outb %%al,%%dx\n" \
+ 		"\tjmp 1f\n" \
+ 		"1:\tjmp 1f\n" \
+ 		"1:"::"a" (value),"d" (port))
+ 
++//read
+ #define inb_p(port) ({ \
+ unsigned char _v; \
+ __asm__ volatile ("inb %%dx,%%al\n" \
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/memory.h patch-new/linux-0.12/include/asm/memory.h
+--- patch-old/linux-0.12/include/asm/memory.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/asm/memory.h	2026-04-04 13:12:07
+@@ -9,6 +9,6 @@
+ void * _res = dest; \
+ __asm__ ("cld;rep;movsb" \
+ 	::"D" ((long)(_res)),"S" ((long)(src)),"c" ((long) (n)) \
+-	:"di","si","cx"); \
++	); \
+ _res; \
+ })
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/segment.h patch-new/linux-0.12/include/asm/segment.h
+--- patch-old/linux-0.12/include/asm/segment.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/asm/segment.h	2026-04-04 13:12:07
+@@ -1,4 +1,7 @@
+-extern inline unsigned char get_fs_byte(const char * addr)
++//#ifndef _SEGMENT_H
++//#define _SEGMENT_H 
++
++static inline unsigned char get_fs_byte(const char * addr)
+ {
+ 	unsigned register char _v;
+ 
+@@ -6,7 +9,7 @@
+ 	return _v;
+ }
+ 
+-extern inline unsigned short get_fs_word(const unsigned short *addr)
++static inline unsigned short get_fs_word(const unsigned short *addr)
+ {
+ 	unsigned short _v;
+ 
+@@ -14,7 +17,7 @@
+ 	return _v;
+ }
+ 
+-extern inline unsigned long get_fs_long(const unsigned long *addr)
++static inline unsigned long get_fs_long(const unsigned long *addr)
+ {
+ 	unsigned long _v;
+ 
+@@ -22,17 +25,17 @@
+ 	return _v;
+ }
+ 
+-extern inline void put_fs_byte(char val,char *addr)
++static inline void put_fs_byte(char val,char *addr)
+ {
+ __asm__ ("movb %0,%%fs:%1"::"r" (val),"m" (*addr));
+ }
+ 
+-extern inline void put_fs_word(short val,short * addr)
++static inline void put_fs_word(short val,short * addr)
+ {
+ __asm__ ("movw %0,%%fs:%1"::"r" (val),"m" (*addr));
+ }
+ 
+-extern inline void put_fs_long(unsigned long val,unsigned long * addr)
++static inline void put_fs_long(unsigned long val,unsigned long * addr)
+ {
+ __asm__ ("movl %0,%%fs:%1"::"r" (val),"m" (*addr));
+ }
+@@ -44,22 +47,23 @@
+  * [ nothing wrong here, Linus ]
+  */
+ 
+-extern inline unsigned long get_fs() 
++static inline unsigned long get_fs() 
+ {
+ 	unsigned short _v;
+ 	__asm__("mov %%fs,%%ax":"=a" (_v):);
+ 	return _v;
+ }
+ 
+-extern inline unsigned long get_ds() 
++static inline unsigned long get_ds() 
+ {
+ 	unsigned short _v;
+ 	__asm__("mov %%ds,%%ax":"=a" (_v):);
+ 	return _v;
+ }
+ 
+-extern inline void set_fs(unsigned long val)
++static inline void set_fs(unsigned long val)
+ {
+ 	__asm__("mov %0,%%fs"::"a" ((unsigned short) val));
+ }
+ 
++//#endif
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/system.h patch-new/linux-0.12/include/asm/system.h
+--- patch-old/linux-0.12/include/asm/system.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/asm/system.h	2026-04-04 13:12:07
+@@ -11,7 +11,7 @@
+ 	"mov %%ax,%%es\n\t" \
+ 	"mov %%ax,%%fs\n\t" \
+ 	"mov %%ax,%%gs" \
+-	:::"ax")
++	:::)
+ 
+ #define sti() __asm__ ("sti"::)
+ #define cli() __asm__ ("cli"::)
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/config.h patch-new/linux-0.12/include/linux/config.h
+--- patch-old/linux-0.12/include/linux/config.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/linux/config.h	2026-04-04 13:12:07
+@@ -6,9 +6,9 @@
+  */
+ #define UTS_SYSNAME "Linux"
+ #define UTS_NODENAME "(none)"	/* set by sethostname() */
+-#define UTS_RELEASE "0"		/* patchlevel */
++#define UTS_RELEASE "0"		    /* patchlevel */
+ #define UTS_VERSION "0.12"
+-#define UTS_MACHINE "i386"	/* hardware type */
++#define UTS_MACHINE "i386"	    /* hardware type */
+ 
+ /* Don't touch these, unless you really know what your doing. */
+ #define DEF_INITSEG	0x9000
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/kernel.h patch-new/linux-0.12/include/linux/kernel.h
+--- patch-old/linux-0.12/include/linux/kernel.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/linux/kernel.h	2026-04-04 13:12:07
+@@ -2,8 +2,8 @@
+  * 'kernel.h' contains some often-used function prototypes etc
+  */
+ void verify_area(void * addr,int count);
+-volatile void panic(const char * str);
+-volatile void do_exit(long error_code);
++void panic(const char * str);
++void do_exit(long error_code); 
+ int printf(const char * fmt, ...);
+ int printk(const char * fmt, ...);
+ void console_print(const char * str);
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/math_emu.h patch-new/linux-0.12/include/linux/math_emu.h
+--- patch-old/linux-0.12/include/linux/math_emu.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/linux/math_emu.h	2026-04-04 13:12:07
+@@ -50,7 +50,7 @@
+ void __math_abort(struct info *, unsigned int);
+ 
+ #define math_abort(x,y) \
+-(((volatile void (*)(struct info *,unsigned int)) __math_abort)((x),(y)))
++(((void (*)(struct info *,unsigned int)) __math_abort)((x),(y)))
+ 
+ /*
+  * Gcc forces this stupid alignment problem: I want to use only two longs
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/mm.h patch-new/linux-0.12/include/linux/mm.h
+--- patch-old/linux-0.12/include/linux/mm.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/linux/mm.h	2026-04-04 13:12:07
+@@ -17,7 +17,7 @@
+ void swap_free(int page_nr);
+ void swap_in(unsigned long *table_ptr);
+ 
+-extern inline volatile void oom(void)
++static inline void oom(void)
+ {
+ 	printk("out of memory\n\r");
+ 	do_exit(SIGSEGV);
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/sched.h patch-new/linux-0.12/include/linux/sched.h
+--- patch-old/linux-0.12/include/linux/sched.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/linux/sched.h	2026-04-04 13:12:07
+@@ -91,26 +91,26 @@
+ 	long	ebp;
+ 	long	esi;
+ 	long	edi;
+-	long	es;		/* 16 high bits zero */
+-	long	cs;		/* 16 high bits zero */
+-	long	ss;		/* 16 high bits zero */
+-	long	ds;		/* 16 high bits zero */
+-	long	fs;		/* 16 high bits zero */
+-	long	gs;		/* 16 high bits zero */
++	long	es;		    /* 16 high bits zero */
++	long	cs;		    /* 16 high bits zero */
++	long	ss;		    /* 16 high bits zero */
++	long	ds;		    /* 16 high bits zero */
++	long	fs;		    /* 16 high bits zero */
++	long	gs;		    /* 16 high bits zero */
+ 	long	ldt;		/* 16 high bits zero */
+ 	long	trace_bitmap;	/* bits: trace 0, bitmap 16-31 */
+ 	struct i387_struct i387;
+ };
+ 
+ struct task_struct {
+-/* these are hardcoded - don't touch */
++    /* these are hardcoded - don't touch */
+ 	long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+ 	long counter;
+ 	long priority;
+ 	long signal;
+ 	struct sigaction sigaction[32];
+ 	long blocked;	/* bitmap of masked signals */
+-/* various fields */
++    /* various fields */
+ 	int exit_code;
+ 	unsigned long start_code,end_code,end_data,brk,start_stack;
+ 	long pid,pgrp,session,leader;
+@@ -128,8 +128,8 @@
+ 	struct rlimit rlim[RLIM_NLIMITS]; 
+ 	unsigned int flags;	/* per process flags, defined below */
+ 	unsigned short used_math;
+-/* file system info */
+-	int tty;		/* -1 if no tty, so it must be signed */
++                        /* file system info */
++	int tty;		    /* -1 if no tty, so it must be signed */
+ 	unsigned short umask;
+ 	struct m_inode * pwd;
+ 	struct m_inode * root;
+@@ -137,9 +137,9 @@
+ 	struct m_inode * library;
+ 	unsigned long close_on_exec;
+ 	struct file * filp[NR_OPEN];
+-/* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
++    /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
+ 	struct desc_struct ldt[3];
+-/* tss for this task */
++    /* tss for this task */
+ 	struct tss_struct tss;
+ };
+ 
+@@ -221,12 +221,12 @@
+  */
+ #define switch_to(n) {\
+ struct {long a,b;} __tmp; \
+-__asm__("cmpl %%ecx,_current\n\t" \
++__asm__("cmpl %%ecx,current\n\t" \
+ 	"je 1f\n\t" \
+ 	"movw %%dx,%1\n\t" \
+-	"xchgl %%ecx,_current\n\t" \
+-	"ljmp %0\n\t" \
+-	"cmpl %%ecx,_last_task_used_math\n\t" \
++	"xchgl %%ecx,current\n\t" \
++	"ljmp *%0\n\t" \
++	"cmpl %%ecx,last_task_used_math\n\t" \
+ 	"jne 1f\n\t" \
+ 	"clts\n" \
+ 	"1:" \
+@@ -245,7 +245,7 @@
+ 	  "m" (*((addr)+4)), \
+ 	  "m" (*((addr)+7)), \
+ 	  "d" (base) \
+-	:"dx")
++	)
+ 
+ #define _set_limit(addr,limit) \
+ __asm__("movw %%dx,%0\n\t" \
+@@ -257,22 +257,24 @@
+ 	::"m" (*(addr)), \
+ 	  "m" (*((addr)+6)), \
+ 	  "d" (limit) \
+-	:"dx")
++	)
+ 
+ #define set_base(ldt,base) _set_base( ((char *)&(ldt)) , base )
+ #define set_limit(ldt,limit) _set_limit( ((char *)&(ldt)) , (limit-1)>>12 )
+ 
+-#define _get_base(addr) ({\
+-unsigned long __base; \
+-__asm__("movb %3,%%dh\n\t" \
+-	"movb %2,%%dl\n\t" \
+-	"shll $16,%%edx\n\t" \
+-	"movw %1,%%dx" \
+-	:"=d" (__base) \
+-	:"m" (*((addr)+2)), \
+-	 "m" (*((addr)+4)), \
+-	 "m" (*((addr)+7))); \
+-__base;})
++static inline unsigned long _get_base(char * addr) 
++{
++    unsigned long __base;
++    __asm__("movb %3,%%dh\n\t"
++	        "movb %2,%%dl\n\t"
++	        "shll $16,%%edx\n\t"
++	        "movw %1,%%dx"
++	        :"=&d" (__base)
++	        :"m" (*((addr)+2)),
++	         "m" (*((addr)+4)),
++	         "m" (*((addr)+7)));
++    return __base;
++}
+ 
+ #define get_base(ldt) _get_base( ((char *)&(ldt)) )
+ 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/string.h patch-new/linux-0.12/include/string.h
+--- patch-old/linux-0.12/include/string.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/string.h	2026-04-04 13:12:07
+@@ -31,7 +31,7 @@
+ 	"stosb\n\t"
+ 	"testb %%al,%%al\n\t"
+ 	"jne 1b"
+-	::"S" (src),"D" (dest):"si","di","ax");
++	::"S" (src),"D" (dest));
+ return dest;
+ }
+ 
+@@ -47,7 +47,7 @@
+ 	"rep\n\t"
+ 	"stosb\n"
+ 	"2:"
+-	::"S" (src),"D" (dest),"c" (count):"si","di","ax","cx");
++	::"S" (src),"D" (dest),"c" (count));
+ return dest;
+ }
+ 
+@@ -61,7 +61,7 @@
+ 	"stosb\n\t"
+ 	"testb %%al,%%al\n\t"
+ 	"jne 1b"
+-	::"S" (src),"D" (dest),"a" (0),"c" (0xffffffff):"si","di","ax","cx");
++	::"S" (src),"D" (dest),"a" (0),"c" (0xffffffff));
+ return dest;
+ }
+ 
+@@ -81,7 +81,7 @@
+ 	"2:\txorl %2,%2\n\t"
+ 	"stosb"
+ 	::"S" (src),"D" (dest),"a" (0),"c" (0xffffffff),"g" (count)
+-	:"si","di","ax","cx");
++	);
+ return dest;
+ }
+ 
+@@ -100,7 +100,7 @@
+ 	"jl 3f\n\t"
+ 	"negl %%eax\n"
+ 	"3:"
+-	:"=a" (__res):"D" (cs),"S" (ct):"si","di");
++	:"=a" (__res):"D" (cs),"S" (ct));
+ return __res;
+ }
+ 
+@@ -121,7 +121,7 @@
+ 	"jl 4f\n\t"
+ 	"negl %%eax\n"
+ 	"4:"
+-	:"=a" (__res):"D" (cs),"S" (ct),"c" (count):"si","di","cx");
++	:"=a" (__res):"D" (cs),"S" (ct),"c" (count));
+ return __res;
+ }
+ 
+@@ -138,7 +138,7 @@
+ 	"movl $1,%1\n"
+ 	"2:\tmovl %1,%0\n\t"
+ 	"decl %0"
+-	:"=a" (__res):"S" (s),"0" (c):"si");
++	:"=a" (__res):"S" (s),"0" (c));
+ return __res;
+ }
+ 
+@@ -154,7 +154,7 @@
+ 	"decl %0\n"
+ 	"2:\ttestb %%al,%%al\n\t"
+ 	"jne 1b"
+-	:"=d" (__res):"0" (0),"S" (s),"a" (c):"ax","si");
++	:"=d" (__res):"0" (0),"S" (s),"a" (c));
+ return __res;
+ }
+ 
+@@ -178,7 +178,7 @@
+ 	"je 1b\n"
+ 	"2:\tdecl %0"
+ 	:"=S" (__res):"a" (0),"c" (0xffffffff),"0" (cs),"g" (ct)
+-	:"ax","cx","dx","di");
++	);
+ return __res-cs;
+ }
+ 
+@@ -202,7 +202,7 @@
+ 	"jne 1b\n"
+ 	"2:\tdecl %0"
+ 	:"=S" (__res):"a" (0),"c" (0xffffffff),"0" (cs),"g" (ct)
+-	:"ax","cx","dx","di");
++	);
+ return __res-cs;
+ }
+ 
+@@ -229,7 +229,7 @@
+ 	"2:\txorl %0,%0\n"
+ 	"3:"
+ 	:"=S" (__res):"a" (0),"c" (0xffffffff),"0" (cs),"g" (ct)
+-	:"ax","cx","dx","di");
++	);
+ return __res;
+ }
+ 
+@@ -256,7 +256,7 @@
+ 	"xorl %%eax,%%eax\n\t"
+ 	"2:"
+ 	:"=a" (__res):"0" (0),"c" (0xffffffff),"S" (cs),"g" (ct)
+-	:"cx","dx","di","si");
++	);
+ return __res;
+ }
+ 
+@@ -268,7 +268,7 @@
+ 	"scasb\n\t"
+ 	"notl %0\n\t"
+ 	"decl %0"
+-	:"=c" (__res):"D" (s),"a" (0),"0" (0xffffffff):"di");
++	:"=c" (__res):"D" (s),"a" (0),"0" (0xffffffff));
+ return __res;
+ }
+ 
+@@ -329,7 +329,7 @@
+ 	"8:"
+ 	:"=b" (__res),"=S" (___strtok)
+ 	:"0" (___strtok),"1" (s),"g" (ct)
+-	:"ax","cx","dx","di");
++	);
+ return __res;
+ }
+ 
+@@ -339,7 +339,7 @@
+ 	"rep\n\t"
+ 	"movsb"
+ 	::"c" (n),"S" (src),"D" (dest)
+-	:"cx","si","di");
++	);
+ return dest;
+ }
+ 
+@@ -350,13 +350,13 @@
+ 	"rep\n\t"
+ 	"movsb"
+ 	::"c" (n),"S" (src),"D" (dest)
+-	:"cx","si","di");
++	);
+ else
+ __asm__("std\n\t"
+ 	"rep\n\t"
+ 	"movsb"
+ 	::"c" (n),"S" (src+n-1),"D" (dest+n-1)
+-	:"cx","si","di");
++	);
+ return dest;
+ }
+ 
+@@ -372,7 +372,7 @@
+ 	"negl %%eax\n"
+ 	"1:"
+ 	:"=a" (__res):"0" (0),"D" (cs),"S" (ct),"c" (count)
+-	:"si","di","cx");
++	);
+ return __res;
+ }
+ 
+@@ -388,7 +388,7 @@
+ 	"movl $1,%0\n"
+ 	"1:\tdecl %0"
+ 	:"=D" (__res):"a" (c),"D" (cs),"c" (count)
+-	:"cx");
++	);
+ return __res;
+ }
+ 
+@@ -398,7 +398,7 @@
+ 	"rep\n\t"
+ 	"stosb"
+ 	::"a" (c),"D" (s),"c" (count)
+-	:"cx","di");
++	);
+ return s;
+ }
+ 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/unistd.h patch-new/linux-0.12/include/unistd.h
+--- patch-old/linux-0.12/include/unistd.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/include/unistd.h	2026-04-04 13:12:07
+@@ -207,7 +207,7 @@
+ int acct(const char * filename);
+ int alarm(int sec);
+ int brk(void * end_data_segment);
+-void * sbrk(ptrdiff_t increment);
++void* sbrk(ptrdiff_t increment);
+ int chdir(const char * filename);
+ int chmod(const char * filename, mode_t mode);
+ int chown(const char * filename, uid_t owner, gid_t group);
+@@ -221,10 +221,12 @@
+ int execl(const char * pathname, char * arg0, ...);
+ int execlp(const char * file, char * arg0, ...);
+ int execle(const char * pathname, char * arg0, ...);
+-volatile void exit(int status);
+-volatile void _exit(int status);
++//volatile void exit(int status);
++void exit(int status);
++//volatile void _exit(int status);
++void _exit(int status);
+ int fcntl(int fildes, int cmd, ...);
+-int fork(void);
++static int fork(void);
+ int getpid(void);
+ int getuid(void);
+ int geteuid(void);
+@@ -238,7 +240,7 @@
+ int mount(const char * specialfile, const char * dir, int rwflag);
+ int nice(int val);
+ int open(const char * filename, int flag, ...);
+-int pause(void);
++static int pause(void);
+ int pipe(int * fildes);
+ int read(int fildes, char * buf, off_t count);
+ int setpgrp(void);
+@@ -249,7 +251,7 @@
+ int stat(const char * filename, struct stat * stat_buf);
+ int fstat(int fildes, struct stat * stat_buf);
+ int stime(time_t * tptr);
+-int sync(void);
++static int sync(void);
+ time_t time(time_t * tloc);
+ time_t times(struct tms * tbuf);
+ int ulimit(int cmd, long limit);
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/init/Makefile patch-new/linux-0.12/init/Makefile
+--- patch-old/linux-0.12/init/Makefile	1970-01-01 08:00:00
++++ patch-new/linux-0.12/init/Makefile	2026-04-04 13:12:07
+@@ -0,0 +1,30 @@
++include ../Makefile.head
++
++LDFLAGS += -r
++CFLAGS	+= -I../include
++CPP	+= -I../include
++
++ifneq ($(RAMDISK_SIZE),)
++  CFLAGS += -DRAMDISK_SIZE=$(RAMDISK_SIZE)
++endif
++
++.c.o:
++	$(Q)$(CC) $(CFLAGS) -c -o $*.o $<
++
++clean:
++	$(Q)rm -f core *.o *.a tmp_make
++	$(Q)for i in *.c;do rm -f `basename $$i .c`.s;done
++
++dep:
++	$(Q)sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	$(Q)(for i in *.c;do $(CPP) -M $$i;done) >> tmp_make
++	$(Q)cp tmp_make Makefile
++
++### Dependencies:
++main.o: main.c ../include/unistd.h ../include/sys/stat.h \
++ ../include/sys/types.h ../include/sys/times.h ../include/sys/utsname.h \
++ ../include/utime.h ../include/time.h ../include/linux/tty.h \
++ ../include/termios.h ../include/linux/sched.h ../include/linux/head.h \
++ ../include/linux/fs.h ../include/linux/mm.h ../include/signal.h \
++ ../include/asm/system.h ../include/asm/io.h ../include/stddef.h \
++ ../include/stdarg.h ../include/fcntl.h
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/init/main.c patch-new/linux-0.12/init/main.c
+--- patch-old/linux-0.12/init/main.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/init/main.c	2026-04-04 13:12:07
+@@ -20,8 +20,11 @@
+  * won't be any messing with the stack from main(), but we define
+  * some others too.
+  */
+-static inline _syscall0(int,fork)
+-static inline _syscall0(int,pause)
++
++static inline fork(void) __attribute__((always_inline));
++static inline pause(void) __attribute__((always_inline));
++static inline _syscall0(int,fork) 
++static inline _syscall0(int,pause) 
+ static inline _syscall1(int,setup,void *,BIOS)
+ static inline _syscall0(int,sync)
+ 
+@@ -81,7 +84,6 @@
+  * clock I'd be interested. Most of this was trial and error, and some
+  * bios-listing reading. Urghh.
+  */
+-
+ #define CMOS_READ(addr) ({ \
+ outb_p(0x80|addr,0x70); \
+ inb_p(0x71); \
+@@ -124,12 +126,14 @@
+ 
+ struct drive_info { char dummy[32]; } drive_info;
+ 
+-void main(void)		/* This really IS void, no error here. */
+-{			/* The startup routine assumes (well, ...) this */
+-/*
+- * Interrupts are still disabled. Do necessary setups, then
+- * enable them
+- */
++/* This really IS void, no error here. */
++/* The startup routine assumes (well, ...) this */
++void main(void)
++{
++    /*
++     * Interrupts are still disabled. Do necessary setups, then
++     * enable them
++     */
+  	ROOT_DEV = ORIG_ROOT_DEV;
+  	SWAP_DEV = ORIG_SWAP_DEV;
+ 	sprintf(term, "TERM=con%dx%d", CON_COLS, CON_ROWS);
+@@ -162,21 +166,27 @@
+ 	floppy_init();
+ 	sti();
+ 	move_to_user_mode();
+-	if (!fork()) {		/* we count on this going ok */
++	if (!fork()) { /* we count on this going ok */
+ 		init();
+ 	}
+-/*
+- *   NOTE!!   For any other task 'pause()' would mean we have to get a
+- * signal to awaken, but task0 is the sole exception (see 'schedule()')
+- * as task 0 gets activated at every idle moment (when no other tasks
+- * can run). For task0 'pause()' just means we go check if some other
+- * task can run, and if not we return here.
+- */
+-	for(;;)
+-		__asm__("int $0x80"::"a" (__NR_pause):"ax");
++    /*
++     * NOTE!! For any other task 'pause()' would mean we have to get a
++     * signal to awaken, but task0 is the sole exception (see 'schedule()')
++     * as task 0 gets activated at every idle moment (when no other tasks
++     * can run). For task0 'pause()' just means we go check if some other
++     * task can run, and if not we return here.
++     */
++	for( ; ; ) pause();
++    //{
++	//	__asm__  volatile (
++    //            "int $0x80"
++    //            :
++    //            :"a" (__NR_pause)
++    //            ); 
++    //}
+ }
+ 
+-static int printf(const char *fmt, ...)
++int printf(const char *fmt, ...)
+ {
+ 	va_list args;
+ 	int i;
+@@ -191,6 +201,7 @@
+ {
+ 	int pid,i;
+ 
++    //
+ 	setup((void *) &drive_info);
+ 	(void) open("/dev/tty1",O_RDWR,0);
+ 	(void) dup(0);
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/init/main.s patch-new/linux-0.12/init/main.s
+--- patch-old/linux-0.12/init/main.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/init/main.s	1970-01-01 08:00:00
+@@ -1,551 +0,0 @@
+-	.file	"init/main.c"
+-gcc_compiled.:
+-.text
+-LC0:
+-	.ascii "out of memory\12\15\0"
+-	.align 2
+-_sprintf:
+-	movl 4(%esp),%edx
+-	leal 12(%esp),%eax
+-	pushl %eax
+-	pushl 12(%esp)
+-	pushl %edx
+-	call _vsprintf
+-	addl $12,%esp
+-	ret
+-	.align 2
+-_time_init:
+-	pushl %ebp
+-	movl %esp,%ebp
+-	subl $44,%esp
+-L65:
+-	movl $128,%eax
+-	movl $112,%edx
+-/APP
+-	outb %al,%dx
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movl $113,%edx
+-/APP
+-	inb %dx,%al
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movb %al,-40(%ebp)
+-	movzbl -40(%ebp),%eax
+-	movl %eax,-36(%ebp)
+-	movl $130,%eax
+-	movl $112,%edx
+-/APP
+-	outb %al,%dx
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movl $113,%edx
+-/APP
+-	inb %dx,%al
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movb %al,-40(%ebp)
+-	movzbl -40(%ebp),%eax
+-	movl %eax,-32(%ebp)
+-	movl $132,%eax
+-	movl $112,%edx
+-/APP
+-	outb %al,%dx
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movl $113,%edx
+-/APP
+-	inb %dx,%al
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movb %al,-40(%ebp)
+-	movzbl -40(%ebp),%eax
+-	movl %eax,-28(%ebp)
+-	movl $135,%eax
+-	movl $112,%edx
+-/APP
+-	outb %al,%dx
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movl $113,%edx
+-/APP
+-	inb %dx,%al
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movb %al,-40(%ebp)
+-	movzbl -40(%ebp),%eax
+-	movl %eax,-24(%ebp)
+-	movl $136,%eax
+-	movl $112,%edx
+-/APP
+-	outb %al,%dx
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movl $113,%edx
+-/APP
+-	inb %dx,%al
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movb %al,-40(%ebp)
+-	movzbl -40(%ebp),%eax
+-	movl %eax,-20(%ebp)
+-	movl $137,%eax
+-	movl $112,%edx
+-/APP
+-	outb %al,%dx
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movl $113,%edx
+-/APP
+-	inb %dx,%al
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movb %al,-40(%ebp)
+-	movzbl -40(%ebp),%eax
+-	movl %eax,-16(%ebp)
+-	movl $128,%eax
+-	movl $112,%edx
+-/APP
+-	outb %al,%dx
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movl $113,%edx
+-/APP
+-	inb %dx,%al
+-	jmp 1f
+-1:	jmp 1f
+-1:
+-/NO_APP
+-	movb %al,-40(%ebp)
+-	movzbl -40(%ebp),%eax
+-	cmpl -36(%ebp),%eax
+-	jne L65
+-	movl -36(%ebp),%eax
+-	andl $15,%eax
+-	movl -36(%ebp),%edx
+-	sarl $4,%edx
+-	leal (%edx,%edx,4),%edx
+-	leal (%eax,%edx,2),%eax
+-	movl %eax,-36(%ebp)
+-	movl -32(%ebp),%eax
+-	andl $15,%eax
+-	movl -32(%ebp),%edx
+-	sarl $4,%edx
+-	leal (%edx,%edx,4),%edx
+-	leal (%eax,%edx,2),%eax
+-	movl %eax,-32(%ebp)
+-	movl -28(%ebp),%eax
+-	andl $15,%eax
+-	movl -28(%ebp),%edx
+-	sarl $4,%edx
+-	leal (%edx,%edx,4),%edx
+-	leal (%eax,%edx,2),%eax
+-	movl %eax,-28(%ebp)
+-	movl -24(%ebp),%eax
+-	andl $15,%eax
+-	movl -24(%ebp),%edx
+-	sarl $4,%edx
+-	leal (%edx,%edx,4),%edx
+-	leal (%eax,%edx,2),%eax
+-	movl %eax,-24(%ebp)
+-	movl -20(%ebp),%eax
+-	andl $15,%eax
+-	movl -20(%ebp),%edx
+-	sarl $4,%edx
+-	leal (%edx,%edx,4),%edx
+-	leal (%eax,%edx,2),%eax
+-	movl %eax,-20(%ebp)
+-	movl -16(%ebp),%eax
+-	andl $15,%eax
+-	movl -16(%ebp),%edx
+-	sarl $4,%edx
+-	leal (%edx,%edx,4),%edx
+-	leal (%eax,%edx,2),%eax
+-	movl %eax,-16(%ebp)
+-	decl -20(%ebp)
+-	leal -36(%ebp),%eax
+-	pushl %eax
+-	call _kernel_mktime
+-	movl %eax,_startup_time
+-	leave
+-	ret
+-.data
+-	.align 2
+-_memory_end:
+-	.long 0
+-	.align 2
+-_buffer_memory_end:
+-	.long 0
+-	.align 2
+-_main_memory_start:
+-	.long 0
+-.text
+-LC1:
+-	.ascii "/bin/sh\0"
+-.data
+-	.align 2
+-_argv_rc:
+-	.long LC1
+-	.long 0
+-.text
+-LC2:
+-	.ascii "HOME=/\0"
+-.data
+-	.align 2
+-_envp_rc:
+-	.long LC2
+-	.long 0
+-	.long 0
+-.text
+-LC3:
+-	.ascii "-/bin/sh\0"
+-.data
+-	.align 2
+-_argv:
+-	.long LC3
+-	.long 0
+-.text
+-LC4:
+-	.ascii "HOME=/usr/root\0"
+-.data
+-	.align 2
+-_envp:
+-	.long LC4
+-	.long 0
+-	.long 0
+-.text
+-LC5:
+-	.ascii "TERM=con%dx%d\0"
+-	.align 2
+-.globl _main
+-_main:
+-	pushl %ebp
+-	movl %esp,%ebp
+-	subl $8,%esp
+-	pushl %edi
+-	pushl %esi
+-	movzwl 590332,%eax
+-	movl %eax,_ROOT_DEV
+-	movzwl 590330,%eax
+-	movl %eax,_SWAP_DEV
+-	movw 589838,%dx
+-	andl $255,%edx
+-	pushl %edx
+-	movw 589838,%ax
+-	andw $65280,%ax
+-	shrw $8,%ax
+-	movw %ax,-4(%ebp)
+-	movzwl -4(%ebp),%eax
+-	pushl %eax
+-	pushl $LC5
+-	pushl $_term
+-	call _sprintf
+-	movl $_term,_envp+4
+-	movl $_term,_envp_rc+4
+-	movl $_drive_info,%edi
+-	movl $589952,%esi
+-	movl $8,%ecx
+-	cld
+-	rep
+-	movsl
+-	movzwl 589826,%eax
+-	sall $10,%eax
+-	addl $1048576,%eax
+-	movl %eax,_memory_end
+-	andl $-4096,_memory_end
+-	addl $16,%esp
+-	cmpl $16777216,_memory_end
+-	jle L69
+-	movl $16777216,_memory_end
+-L69:
+-	cmpl $12582912,_memory_end
+-	jle L70
+-	movl $4194304,_buffer_memory_end
+-	jmp L71
+-	.align 2
+-L70:
+-	cmpl $6291456,_memory_end
+-	jle L72
+-	movl $2097152,_buffer_memory_end
+-	jmp L71
+-	.align 2
+-L72:
+-	movl $1048576,_buffer_memory_end
+-L71:
+-	movl _buffer_memory_end,%eax
+-	movl %eax,_main_memory_start
+-	pushl _memory_end
+-	pushl _buffer_memory_end
+-	call _mem_init
+-	call _trap_init
+-	call _blk_dev_init
+-	call _chr_dev_init
+-	call _tty_init
+-	call _time_init
+-	call _sched_init
+-	pushl _buffer_memory_end
+-	call _buffer_init
+-	call _hd_init
+-	call _floppy_init
+-/APP
+-	sti
+-	movl %esp,%eax
+-	pushl $0x17
+-	pushl %eax
+-	pushfl
+-	pushl $0x0f
+-	pushl $1f
+-	iret
+-1:	movl $0x17,%eax
+-	movw %ax,%ds
+-	movw %ax,%es
+-	movw %ax,%fs
+-	movw %ax,%gs
+-/NO_APP
+-	addl $12,%esp
+-	movl $2,%eax
+-/APP
+-	int $0x80
+-/NO_APP
+-	movl %eax,%edx
+-	testl %edx,%edx
+-	jge L75
+-	negl %edx
+-	movl %edx,_errno
+-	movl $-1,%edx
+-L75:
+-	testl %edx,%edx
+-	jne L74
+-	call _init
+-L74:
+-L77:
+-	movl $29,%eax
+-/APP
+-	int $0x80
+-/NO_APP
+-	jmp L77
+-	.align 2
+-	leal -16(%ebp),%esp
+-	popl %esi
+-	popl %edi
+-	leave
+-	ret
+-	.align 2
+-_printf:
+-	pushl %ebx
+-	leal 12(%esp),%eax
+-	pushl %eax
+-	pushl 12(%esp)
+-	pushl $_printbuf
+-	call _vsprintf
+-	movl %eax,%ebx
+-	pushl %ebx
+-	pushl $_printbuf
+-	pushl $1
+-	call _write
+-	movl %ebx,%eax
+-	addl $24,%esp
+-	popl %ebx
+-	ret
+-LC6:
+-	.ascii "/dev/tty1\0"
+-LC7:
+-	.ascii "%d buffers = %d bytes buffer space\12\15\0"
+-LC8:
+-	.ascii "Free mem: %d bytes\12\15\0"
+-LC9:
+-	.ascii "/etc/rc\0"
+-LC10:
+-	.ascii "Fork failed in init\15\12\0"
+-LC11:
+-	.ascii "\12\15child %d died with code %04x\12\15\0"
+-	.align 2
+-.globl _init
+-_init:
+-	pushl %ebp
+-	movl %esp,%ebp
+-	subl $4,%esp
+-	pushl %edi
+-	pushl %esi
+-	pushl %ebx
+-	xorl %eax,%eax
+-	movl $_drive_info,%ebx
+-/APP
+-	int $0x80
+-/NO_APP
+-	testl %eax,%eax
+-	jge L82
+-	negl %eax
+-	movl %eax,_errno
+-L82:
+-	pushl $0
+-	pushl $2
+-	pushl $LC6
+-	call _open
+-	pushl $0
+-	call _dup
+-	pushl $0
+-	call _dup
+-	movl _nr_buffers,%eax
+-	sall $10,%eax
+-	pushl %eax
+-	pushl _nr_buffers
+-	pushl $LC7
+-	call _printf
+-	addl $32,%esp
+-	movl _memory_end,%eax
+-	subl _main_memory_start,%eax
+-	pushl %eax
+-	pushl $LC8
+-	call _printf
+-	addl $8,%esp
+-	movl $2,%eax
+-/APP
+-	int $0x80
+-/NO_APP
+-	testl %eax,%eax
+-	jl L86
+-	movl %eax,%edi
+-	jmp L85
+-	.align 2
+-L86:
+-	negl %eax
+-	movl %eax,_errno
+-	movl $-1,%edi
+-L85:
+-	testl %edi,%edi
+-	jne L84
+-	pushl $0
+-	call _close
+-	pushl $0
+-	pushl $0
+-	pushl $LC9
+-	call _open
+-	addl $16,%esp
+-	testl %eax,%eax
+-	je L87
+-	pushl $1
+-	call __exit
+-	.align 2
+-L87:
+-	pushl $_envp_rc
+-	pushl $_argv_rc
+-	pushl $LC1
+-	call _execve
+-	pushl $2
+-	call __exit
+-	.align 2
+-L84:
+-	testl %edi,%edi
+-	jle L88
+-	leal -4(%ebp),%esi
+-L89:
+-	pushl %esi
+-	call _wait
+-	addl $4,%esp
+-	cmpl %edi,%eax
+-	jne L89
+-L88:
+-	leal -4(%ebp),%esi
+-L91:
+-	movl $2,%eax
+-/APP
+-	int $0x80
+-/NO_APP
+-	testl %eax,%eax
+-	jge L94
+-	negl %eax
+-	movl %eax,_errno
+-	movl $-1,%eax
+-L94:
+-	movl %eax,%edi
+-	testl %edi,%edi
+-	jge L93
+-	pushl $LC10
+-	call _printf
+-	addl $4,%esp
+-	jmp L91
+-	.align 2
+-L93:
+-	testl %edi,%edi
+-	jne L96
+-	pushl $0
+-	call _close
+-	pushl $1
+-	call _close
+-	pushl $2
+-	call _close
+-	call _setsid
+-	pushl $0
+-	pushl $2
+-	pushl $LC6
+-	call _open
+-	pushl $0
+-	call _dup
+-	pushl $0
+-	call _dup
+-	addl $32,%esp
+-	pushl $_envp
+-	pushl $_argv
+-	pushl $LC1
+-	call _execve
+-	pushl %eax
+-	call __exit
+-	.align 2
+-L96:
+-L97:
+-	pushl %esi
+-	call _wait
+-	addl $4,%esp
+-	cmpl %edi,%eax
+-	jne L97
+-	pushl -4(%ebp)
+-	pushl %edi
+-	pushl $LC11
+-	call _printf
+-	addl $12,%esp
+-	movl $36,%eax
+-/APP
+-	int $0x80
+-/NO_APP
+-	testl %eax,%eax
+-	jge L91
+-	negl %eax
+-	movl %eax,_errno
+-	jmp L91
+-	.align 2
+-	leal -16(%ebp),%esp
+-	popl %ebx
+-	popl %esi
+-	popl %edi
+-	leave
+-	ret
+-.comm _drive_info,32
+-.lcomm _term,32
+-.lcomm _printbuf,1024
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/Makefile patch-new/linux-0.12/kernel/Makefile
+--- patch-old/linux-0.12/kernel/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/Makefile	2026-04-04 13:12:07
+@@ -6,22 +6,29 @@
+ # unless it's something special (ie not a .c file).
+ #
+ 
+-AR	=gar
+-AS	=gas
+-LD	=gld
+-LDFLAGS	=-s -x
+-CC	=gcc
+-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs \
+-	-finline-functions -mstring-insns -nostdinc -I../include
+-CPP	=gcc -E -nostdinc -I../include
++include ../Makefile.header
+ 
++LDFLAGS	+= -r
++
++# NOTE!: do not try to add -On to CFLAGS with gcc4.x, which will optimize the
++# memcpy function a lot to let the kernel not work, for fixing this problem,
++# please refer to glibc and rewrite the memcpy in include/string.h, or just not
++# use any -On options with gcc 4.x when compiling it. in fact, we only can not
++# use -On with gcc4.x to compile fork.c, but after that you need to isolate the
++# compling procedure of it, it's not good too. for playing with linux-0.11, we
++# just have fun, have no much concerning about the performance.
++
++CFLAGS	+= -I../include
++
++CPP	+= -I../include
++
+ .c.s:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-S -o $*.s $<
+ .s.o:
+-	$(AS) -c -o $*.o $<
++	@$(AS) -o $*.o $<
+ .c.o:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-c -o $*.o $<
+ 
+ OBJS  = sched.o sys_call.o traps.o asm.o fork.o \
+@@ -29,65 +36,53 @@
+ 	signal.o mktime.o
+ 
+ kernel.o: $(OBJS)
+-	$(LD) -r -o kernel.o $(OBJS)
+-	sync
++	@$(LD) $(LDFLAGS) -o kernel.o $(OBJS)
++	@sync
+ 
+ clean:
+-	rm -f core *.o *.a tmp_make keyboard.s
+-	for i in *.c;do rm -f `basename $$i .c`.s;done
+-	(cd chr_drv; make clean)
+-	(cd blk_drv; make clean)
+-	(cd math; make clean)
++	@rm -f core *.o *.a tmp_make keyboard.s
++	@for i in *.c;do rm -f `basename $$i .c`.s;done
++	@for i in chr_drv blk_drv math; do make clean -C $$i; done
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
+ 		$(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
+-	(cd chr_drv; make dep)
+-	(cd blk_drv; make dep)
++	@cp tmp_make Makefile
++	@for i in chr_drv blk_drv; do make dep -C $$i; done
+ 
+ ### Dependencies:
+-exit.s exit.o : exit.c ../include/errno.h ../include/signal.h \
++exit.s exit.o: exit.c ../include/errno.h ../include/signal.h \
+   ../include/sys/types.h ../include/sys/wait.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/linux/mm.h \
+-  ../include/linux/kernel.h ../include/sys/param.h ../include/sys/time.h \
+-  ../include/time.h ../include/sys/resource.h ../include/linux/tty.h \
+-  ../include/termios.h ../include/asm/segment.h 
+-fork.s fork.o : fork.c ../include/errno.h ../include/linux/sched.h \
++  ../include/linux/kernel.h ../include/linux/tty.h ../include/termios.h \
++  ../include/asm/segment.h
++fork.s fork.o: fork.c ../include/errno.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/asm/segment.h ../include/asm/system.h 
+-mktime.s mktime.o : mktime.c ../include/time.h 
+-panic.s panic.o : panic.c ../include/linux/kernel.h ../include/linux/sched.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/kernel.h \
++  ../include/asm/segment.h ../include/asm/system.h
++mktime.s mktime.o: mktime.c ../include/time.h
++panic.s panic.o: panic.c ../include/linux/kernel.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/signal.h ../include/sys/param.h \
+-  ../include/sys/time.h ../include/time.h ../include/sys/resource.h 
+-printk.s printk.o : printk.c ../include/stdarg.h ../include/stddef.h \
+-  ../include/linux/kernel.h 
+-sched.s sched.o : sched.c ../include/linux/sched.h ../include/linux/head.h \
++  ../include/linux/mm.h ../include/signal.h
++printk.s printk.o: printk.c ../include/stdarg.h ../include/stddef.h \
++  ../include/linux/kernel.h
++sched.s sched.o: sched.c ../include/linux/sched.h ../include/linux/head.h \
+   ../include/linux/fs.h ../include/sys/types.h ../include/linux/mm.h \
+-  ../include/linux/kernel.h ../include/signal.h ../include/sys/param.h \
+-  ../include/sys/time.h ../include/time.h ../include/sys/resource.h \
+-  ../include/linux/sys.h ../include/linux/fdreg.h ../include/asm/system.h \
+-  ../include/asm/io.h ../include/asm/segment.h 
+-signal.s signal.o : signal.c ../include/linux/sched.h ../include/linux/head.h \
++  ../include/signal.h ../include/linux/kernel.h ../include/linux/sys.h \
++  ../include/linux/fdreg.h ../include/asm/system.h ../include/asm/io.h \
++  ../include/asm/segment.h
++signal.s signal.o: signal.c ../include/linux/sched.h ../include/linux/head.h \
+   ../include/linux/fs.h ../include/sys/types.h ../include/linux/mm.h \
+-  ../include/linux/kernel.h ../include/signal.h ../include/sys/param.h \
+-  ../include/sys/time.h ../include/time.h ../include/sys/resource.h \
+-  ../include/asm/segment.h ../include/errno.h 
+-sys.s sys.o : sys.c ../include/errno.h ../include/linux/sched.h \
++  ../include/signal.h ../include/linux/kernel.h ../include/asm/segment.h
++sys.s sys.o: sys.c ../include/errno.h ../include/linux/sched.h \
+   ../include/linux/head.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/linux/tty.h ../include/termios.h \
+-  ../include/linux/config.h ../include/asm/segment.h ../include/sys/times.h \
+-  ../include/sys/utsname.h ../include/string.h 
+-traps.s traps.o : traps.c ../include/string.h ../include/linux/head.h \
++  ../include/linux/mm.h ../include/signal.h ../include/linux/tty.h \
++  ../include/termios.h ../include/linux/kernel.h ../include/asm/segment.h \
++  ../include/sys/times.h ../include/sys/utsname.h
++traps.s traps.o: traps.c ../include/string.h ../include/linux/head.h \
+   ../include/linux/sched.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h ../include/asm/system.h ../include/asm/segment.h \
+-  ../include/asm/io.h 
+-vsprintf.s vsprintf.o : vsprintf.c ../include/stdarg.h ../include/string.h 
++  ../include/linux/mm.h ../include/signal.h ../include/linux/kernel.h \
++  ../include/asm/system.h ../include/asm/segment.h ../include/asm/io.h
++vsprintf.s vsprintf.o: vsprintf.c ../include/stdarg.h ../include/string.h
++who.s who.o: who.c ../include/linux/kernel.h ../include/unistd.h 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/asm.s patch-new/linux-0.12/kernel/asm.s
+--- patch-old/linux-0.12/kernel/asm.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/asm.s	2026-04-04 13:12:07
+@@ -11,14 +11,14 @@
+  * the fpu must be properly saved/resored. This hasn't been tested.
+  */
+ 
+-.globl _divide_error,_debug,_nmi,_int3,_overflow,_bounds,_invalid_op
+-.globl _double_fault,_coprocessor_segment_overrun
+-.globl _invalid_TSS,_segment_not_present,_stack_segment
+-.globl _general_protection,_coprocessor_error,_irq13,_reserved
+-.globl _alignment_check
++.globl divide_error,debug,nmi,int3,overflow,bounds,invalid_op
++.globl double_fault,coprocessor_segment_overrun
++.globl invalid_TSS,segment_not_present,stack_segment
++.globl general_protection,coprocessor_error,irq13,reserved
++.globl alignment_check
+ 
+-_divide_error:
+-	pushl $_do_divide_error
++divide_error:
++	pushl $do_divide_error
+ no_error_code:
+ 	xchgl %eax,(%esp)
+ 	pushl %ebx
+@@ -51,39 +51,39 @@
+ 	popl %eax
+ 	iret
+ 
+-_debug:
+-	pushl $_do_int3		# _do_debug
++debug:
++	pushl $do_int3		# _do_debug
+ 	jmp no_error_code
+ 
+-_nmi:
+-	pushl $_do_nmi
++nmi:
++	pushl $do_nmi
+ 	jmp no_error_code
+ 
+-_int3:
+-	pushl $_do_int3
++int3:
++	pushl $do_int3
+ 	jmp no_error_code
+ 
+-_overflow:
+-	pushl $_do_overflow
++overflow:
++	pushl $do_overflow
+ 	jmp no_error_code
+ 
+-_bounds:
+-	pushl $_do_bounds
++bounds:
++	pushl $do_bounds
+ 	jmp no_error_code
+ 
+-_invalid_op:
+-	pushl $_do_invalid_op
++invalid_op:
++	pushl $do_invalid_op
+ 	jmp no_error_code
+ 
+-_coprocessor_segment_overrun:
+-	pushl $_do_coprocessor_segment_overrun
++coprocessor_segment_overrun:
++	pushl $do_coprocessor_segment_overrun
+ 	jmp no_error_code
+ 
+-_reserved:
+-	pushl $_do_reserved
++reserved:
++	pushl $do_reserved
+ 	jmp no_error_code
+ 
+-_irq13:
++irq13:
+ 	pushl %eax
+ 	xorb %al,%al
+ 	outb %al,$0xF0
+@@ -93,10 +93,10 @@
+ 1:	jmp 1f
+ 1:	outb %al,$0xA0
+ 	popl %eax
+-	jmp _coprocessor_error
++	jmp coprocessor_error
+ 
+-_double_fault:
+-	pushl $_do_double_fault
++double_fault:
++	pushl $do_double_fault
+ error_code:
+ 	xchgl %eax,4(%esp)		# error code <-> %eax
+ 	xchgl %ebx,(%esp)		# &function <-> %ebx
+@@ -129,23 +129,23 @@
+ 	popl %eax
+ 	iret
+ 
+-_invalid_TSS:
+-	pushl $_do_invalid_TSS
++invalid_TSS:
++	pushl $do_invalid_TSS
+ 	jmp error_code
+ 
+-_segment_not_present:
+-	pushl $_do_segment_not_present
++segment_not_present:
++	pushl $do_segment_not_present
+ 	jmp error_code
+ 
+-_stack_segment:
+-	pushl $_do_stack_segment
++stack_segment:
++	pushl $do_stack_segment
+ 	jmp error_code
+ 
+-_general_protection:
+-	pushl $_do_general_protection
++general_protection:
++	pushl $do_general_protection
+ 	jmp error_code
+ 
+-_alignment_check:
+-	pushl $_do_alignment_check
++alignment_check:
++	pushl $do_alignment_check
+ 	jmp error_code
+ 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/Makefile patch-new/linux-0.12/kernel/blk_drv/Makefile
+--- patch-old/linux-0.12/kernel/blk_drv/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/blk_drv/Makefile	2026-04-04 13:12:07
+@@ -6,66 +6,57 @@
+ # unless it's something special (ie not a .c file).
+ #
+ 
+-AR	=gar
+-AS	=gas
+-LD	=gld
+-LDFLAGS	=-s -x
+-CC	=gcc
+-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs \
+-	-finline-functions -mstring-insns -nostdinc -I../../include
+-CPP	=gcc -E -nostdinc -I../../include
++include ../../Makefile.header
+ 
++CFLAGS	+= -I../../include
++CPP	+= -I../../include
++
+ .c.s:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-S -o $*.s $<
+ .s.o:
+-	$(AS) -c -o $*.o $<
++	@$(AS) -o $*.o $<
+ .c.o:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-c -o $*.o $<
+ 
+ OBJS  = ll_rw_blk.o floppy.o hd.o ramdisk.o
+ 
+ blk_drv.a: $(OBJS)
+-	$(AR) rcs blk_drv.a $(OBJS)
+-	sync
++	@$(AR) rcs blk_drv.a $(OBJS)
++	@sync
+ 
+ clean:
+-	rm -f core *.o *.a tmp_make
+-	for i in *.c;do rm -f `basename $$i .c`.s;done
++	@rm -f core *.o *.a tmp_make
++	@for i in *.c;do rm -f `basename $$i .c`.s;done
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
+ 		$(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
++	@cp tmp_make Makefile
+ 
+ ### Dependencies:
+-floppy.s floppy.o : floppy.c ../../include/linux/sched.h ../../include/linux/head.h \
+-  ../../include/linux/fs.h ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h \
+-  ../../include/sys/param.h ../../include/sys/time.h ../../include/time.h \
+-  ../../include/sys/resource.h ../../include/linux/fdreg.h \
++floppy.s floppy.o: floppy.c ../../include/linux/sched.h ../../include/linux/head.h \
++  ../../include/linux/fs.h ../../include/sys/types.h \
++  ../../include/linux/mm.h ../../include/signal.h \
++  ../../include/linux/kernel.h ../../include/linux/fdreg.h \
+   ../../include/asm/system.h ../../include/asm/io.h \
+-  ../../include/asm/segment.h blk.h 
+-hd.s hd.o : hd.c ../../include/linux/config.h ../../include/linux/sched.h \
++  ../../include/asm/segment.h blk.h
++hd.s hd.o: hd.c ../../include/linux/config.h ../../include/linux/sched.h \
+   ../../include/linux/head.h ../../include/linux/fs.h \
+   ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h \
+-  ../../include/sys/param.h ../../include/sys/time.h ../../include/time.h \
+-  ../../include/sys/resource.h ../../include/linux/hdreg.h \
+-  ../../include/asm/system.h ../../include/asm/io.h \
+-  ../../include/asm/segment.h blk.h 
+-ll_rw_blk.s ll_rw_blk.o : ll_rw_blk.c ../../include/errno.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h \
+-  ../../include/sys/param.h ../../include/sys/time.h ../../include/time.h \
+-  ../../include/sys/resource.h ../../include/asm/system.h blk.h 
+-ramdisk.s ramdisk.o : ramdisk.c ../../include/string.h ../../include/linux/config.h \
++  ../../include/signal.h ../../include/linux/kernel.h \
++  ../../include/linux/hdreg.h ../../include/asm/system.h \
++  ../../include/asm/io.h ../../include/asm/segment.h blk.h
++ll_rw_blk.s ll_rw_blk.o: ll_rw_blk.c ../../include/errno.h \
+   ../../include/linux/sched.h ../../include/linux/head.h \
+-  ../../include/linux/fs.h ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h \
+-  ../../include/sys/param.h ../../include/sys/time.h ../../include/time.h \
+-  ../../include/sys/resource.h ../../include/asm/system.h \
+-  ../../include/asm/segment.h ../../include/asm/memory.h blk.h 
++  ../../include/linux/fs.h ../../include/sys/types.h \
++  ../../include/linux/mm.h ../../include/signal.h \
++  ../../include/linux/kernel.h ../../include/asm/system.h blk.h
++ramdisk.s ramdisk.o: ramdisk.c ../../include/string.h ../../include/linux/config.h \
++  ../../include/linux/sched.h ../../include/linux/head.h \
++  ../../include/linux/fs.h ../../include/sys/types.h \
++  ../../include/linux/mm.h ../../include/signal.h \
++  ../../include/linux/kernel.h ../../include/asm/system.h \
++  ../../include/asm/segment.h ../../include/asm/memory.h blk.h
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/blk.h patch-new/linux-0.12/kernel/blk_drv/blk.h
+--- patch-old/linux-0.12/kernel/blk_drv/blk.h	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/blk_drv/blk.h	2026-04-04 13:12:07
+@@ -87,7 +87,7 @@
+ #define DEVICE_ON(device)
+ #define DEVICE_OFF(device)
+ 
+-#elif
++#else
+ /* unknown blk device */
+ #error "unknown blk device"
+ 
+@@ -107,7 +107,7 @@
+ #endif
+ static void (DEVICE_REQUEST)(void);
+ 
+-extern inline void unlock_buffer(struct buffer_head * bh)
++static inline void unlock_buffer(struct buffer_head * bh)
+ {
+ 	if (!bh->b_lock)
+ 		printk(DEVICE_NAME ": free buffer being unlocked\n");
+@@ -115,7 +115,7 @@
+ 	wake_up(&bh->b_wait);
+ }
+ 
+-extern inline void end_request(int uptodate)
++static inline void end_request(int uptodate)
+ {
+ 	DEVICE_OFF(CURRENT->dev);
+ 	if (CURRENT->bh) {
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/floppy.c patch-new/linux-0.12/kernel/blk_drv/floppy.c
+--- patch-old/linux-0.12/kernel/blk_drv/floppy.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/blk_drv/floppy.c	2026-04-04 13:12:07
+@@ -156,7 +156,7 @@
+ #define copy_buffer(from,to) \
+ __asm__("cld ; rep ; movsl" \
+ 	::"c" (BLOCK_SIZE/4),"S" ((long)(from)),"D" ((long)(to)) \
+-	:"cx","di","si")
++	)
+ 
+ static void setup_DMA(void)
+ {
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/hd.c patch-new/linux-0.12/kernel/blk_drv/hd.c
+--- patch-old/linux-0.12/kernel/blk_drv/hd.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/blk_drv/hd.c	2026-04-04 13:12:07
+@@ -62,10 +62,10 @@
+ static int hd_sizes[5*MAX_HD] = {0, };
+ 
+ #define port_read(port,buf,nr) \
+-__asm__("cld;rep;insw"::"d" (port),"D" (buf),"c" (nr):"cx","di")
++__asm__("cld;rep;insw"::"d" (port),"D" (buf),"c" (nr))
+ 
+ #define port_write(port,buf,nr) \
+-__asm__("cld;rep;outsw"::"d" (port),"S" (buf),"c" (nr):"cx","si")
++__asm__("cld;rep;outsw"::"d" (port),"S" (buf),"c" (nr))
+ 
+ extern void hd_interrupt(void);
+ extern void rd_load(void);
+@@ -165,12 +165,21 @@
+ 	return (0);
+ }
+ 
++//
+ static int controller_ready(void)
+ {
+-	int retries = 100000;
+ 
+-	while (--retries && (inb_p(HD_STATUS)&0xc0)!=0x40);
+-	return (retries);
++    int n = 10;
++    int retries;
++
++    while (--n) {
++        retries = 100000;
++        if (inb_p(HD_STATUS)&0x80) {
++            while (--retries) ;
++        } else 
++            break;
++    }
++    return n;
+ }
+ 
+ static int win_result(void)
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/ll_rw_blk.c patch-new/linux-0.12/kernel/blk_drv/ll_rw_blk.c
+--- patch-old/linux-0.12/kernel/blk_drv/ll_rw_blk.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/blk_drv/ll_rw_blk.c	2026-04-04 13:12:07
+@@ -103,6 +103,7 @@
+ 	sti();
+ }
+ 
++//
+ static void make_request(int major,int rw, struct buffer_head * bh)
+ {
+ 	struct request * req;
+@@ -195,6 +196,7 @@
+ 	schedule();
+ }	
+ 
++//
+ void ll_rw_block(int rw, struct buffer_head * bh)
+ {
+ 	unsigned int major;
+@@ -207,11 +209,13 @@
+ 	make_request(major,rw,bh);
+ }
+ 
++//
+ void blk_dev_init(void)
+ {
+ 	int i;
+ 
+-	for (i=0 ; i<NR_REQUEST ; i++) {
++	for (i = 0; i < NR_REQUEST; i++) 
++    {
+ 		request[i].dev = -1;
+ 		request[i].next = NULL;
+ 	}
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/Makefile patch-new/linux-0.12/kernel/chr_drv/Makefile
+--- patch-old/linux-0.12/kernel/chr_drv/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/chr_drv/Makefile	2026-04-04 13:12:07
+@@ -6,83 +6,62 @@
+ # unless it's something special (ie not a .c file).
+ #
+ 
+-AR	=gar
+-AS	=gas
+-LD	=gld
+-LDFLAGS	=-s -x
+-CC	=gcc
+-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs \
+-	-finline-functions -mstring-insns -nostdinc -I../../include
+-CPP	=gcc -E -nostdinc -I../../include
++include ../../Makefile.header
+ 
++CFLAGS	+= -I../../include
++CPP	+= -I../../include
++
+ .c.s:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-S -o $*.s $<
+ .s.o:
+-	$(AS) -c -o $*.o $<
++	@$(AS) -o $*.o $<
+ .c.o:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-c -o $*.o $<
+ 
+ OBJS  = tty_io.o console.o keyboard.o serial.o rs_io.o \
+ 	tty_ioctl.o pty.o
+ 
+ chr_drv.a: $(OBJS)
+-	$(AR) rcs chr_drv.a $(OBJS)
++	@$(AR) rcs chr_drv.a $(OBJS)
+ 	sync
+ 
+-keyboard.s: keyboard.S
+-	$(CPP) -traditional keyboard.S -o keyboard.s
++keyboard.s: keyboard.S ../../include/linux/config.h
++	@$(CPP) keyboard.S -o keyboard.s
+ 
+ clean:
+-	rm -f core *.o *.a tmp_make keyboard.s
+-	for i in *.c;do rm -f `basename $$i .c`.s;done
++	@rm -f core *.o *.a tmp_make keyboard.s
++	@for i in *.c;do rm -f `basename $$i .c`.s;done
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
+ 		$(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
++	@cp tmp_make Makefile
+ 
+ ### Dependencies:
+-console.s console.o : console.c ../../include/linux/sched.h \
++console.s console.o: console.c ../../include/linux/sched.h \
+   ../../include/linux/head.h ../../include/linux/fs.h \
+   ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h \
+-  ../../include/sys/param.h ../../include/sys/time.h ../../include/time.h \
+-  ../../include/sys/resource.h ../../include/linux/tty.h \
+-  ../../include/termios.h ../../include/linux/config.h ../../include/asm/io.h \
+-  ../../include/asm/system.h ../../include/asm/segment.h \
+-  ../../include/string.h ../../include/errno.h 
+-pty.s pty.o : pty.c ../../include/linux/tty.h ../../include/termios.h \
+-  ../../include/sys/types.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/linux/mm.h ../../include/linux/kernel.h \
+-  ../../include/signal.h ../../include/sys/param.h ../../include/sys/time.h \
+-  ../../include/time.h ../../include/sys/resource.h \
+-  ../../include/asm/system.h ../../include/asm/io.h 
+-serial.s serial.o : serial.c ../../include/linux/tty.h ../../include/termios.h \
+-  ../../include/sys/types.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/linux/mm.h ../../include/linux/kernel.h \
+-  ../../include/signal.h ../../include/sys/param.h ../../include/sys/time.h \
+-  ../../include/time.h ../../include/sys/resource.h \
+-  ../../include/asm/system.h ../../include/asm/io.h 
+-tty_io.s tty_io.o : tty_io.c ../../include/ctype.h ../../include/errno.h \
+-  ../../include/signal.h ../../include/sys/types.h ../../include/unistd.h \
+-  ../../include/sys/stat.h ../../include/sys/time.h ../../include/time.h \
+-  ../../include/sys/times.h ../../include/sys/utsname.h \
+-  ../../include/sys/param.h ../../include/sys/resource.h \
+-  ../../include/utime.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/linux/mm.h ../../include/linux/kernel.h \
++  ../../include/signal.h ../../include/linux/tty.h \
++  ../../include/termios.h ../../include/asm/io.h \
++  ../../include/asm/system.h
++serial.s serial.o: serial.c ../../include/linux/tty.h ../../include/termios.h \
++  ../../include/linux/sched.h ../../include/linux/head.h \
++  ../../include/linux/fs.h ../../include/sys/types.h \
++  ../../include/linux/mm.h ../../include/signal.h \
++  ../../include/asm/system.h ../../include/asm/io.h
++tty_io.s tty_io.o: tty_io.c ../../include/ctype.h ../../include/errno.h \
++  ../../include/signal.h ../../include/sys/types.h \
++  ../../include/linux/sched.h ../../include/linux/head.h \
++  ../../include/linux/fs.h ../../include/linux/mm.h \
+   ../../include/linux/tty.h ../../include/termios.h \
+-  ../../include/asm/segment.h ../../include/asm/system.h 
+-tty_ioctl.s tty_ioctl.o : tty_ioctl.c ../../include/errno.h ../../include/termios.h \
+-  ../../include/sys/types.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/linux/mm.h ../../include/linux/kernel.h \
+-  ../../include/signal.h ../../include/sys/param.h ../../include/sys/time.h \
+-  ../../include/time.h ../../include/sys/resource.h ../../include/linux/tty.h \
++  ../../include/asm/segment.h ../../include/asm/system.h
++tty_ioctl.s tty_ioctl.o: tty_ioctl.c ../../include/errno.h ../../include/termios.h \
++  ../../include/linux/sched.h ../../include/linux/head.h \
++  ../../include/linux/fs.h ../../include/sys/types.h \
++  ../../include/linux/mm.h ../../include/signal.h \
++  ../../include/linux/kernel.h ../../include/linux/tty.h \
+   ../../include/asm/io.h ../../include/asm/segment.h \
+-  ../../include/asm/system.h 
++  ../../include/asm/system.h
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/console.c patch-new/linux-0.12/kernel/chr_drv/console.c
+--- patch-old/linux-0.12/kernel/chr_drv/console.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/chr_drv/console.c	2026-04-04 13:12:07
+@@ -199,14 +199,14 @@
+ 				__asm__("cld\n\t"
+ 					"rep\n\t"
+ 					"movsl\n\t"
+-					"movl _video_num_columns,%1\n\t"
++					"movl video_num_columns,%1\n\t"
+ 					"rep\n\t"
+ 					"stosw"
+ 					::"a" (video_erase_char),
+ 					"c" ((video_num_lines-1)*video_num_columns>>1),
+ 					"D" (video_mem_start),
+ 					"S" (origin)
+-					:"cx","di","si");
++					);
+ 				scr_end -= origin-video_mem_start;
+ 				pos -= origin-video_mem_start;
+ 				origin = video_mem_start;
+@@ -217,21 +217,21 @@
+ 					::"a" (video_erase_char),
+ 					"c" (video_num_columns),
+ 					"D" (scr_end-video_size_row)
+-					:"cx","di");
++					);
+ 			}
+ 			set_origin(currcons);
+ 		} else {
+ 			__asm__("cld\n\t"
+ 				"rep\n\t"
+ 				"movsl\n\t"
+-				"movl _video_num_columns,%%ecx\n\t"
++				"movl video_num_columns,%%ecx\n\t"
+ 				"rep\n\t"
+ 				"stosw"
+ 				::"a" (video_erase_char),
+ 				"c" ((bottom-top-1)*video_num_columns>>1),
+ 				"D" (origin+video_size_row*top),
+ 				"S" (origin+video_size_row*(top+1))
+-				:"cx","di","si");
++				);
+ 		}
+ 	}
+ 	else		/* Not EGA/VGA */
+@@ -239,14 +239,14 @@
+ 		__asm__("cld\n\t"
+ 			"rep\n\t"
+ 			"movsl\n\t"
+-			"movl _video_num_columns,%%ecx\n\t"
++			"movl video_num_columns,%%ecx\n\t"
+ 			"rep\n\t"
+ 			"stosw"
+ 			::"a" (video_erase_char),
+ 			"c" ((bottom-top-1)*video_num_columns>>1),
+ 			"D" (origin+video_size_row*top),
+ 			"S" (origin+video_size_row*(top+1))
+-			:"cx","di","si");
++			);
+ 	}
+ }
+ 
+@@ -260,14 +260,14 @@
+ 			"rep\n\t"
+ 			"movsl\n\t"
+ 			"addl $2,%%edi\n\t"	/* %edi has been decremented by 4 */
+-			"movl _video_num_columns,%%ecx\n\t"
++			"movl video_num_columns,%%ecx\n\t"
+ 			"rep\n\t"
+ 			"stosw"
+ 			::"a" (video_erase_char),
+ 			"c" ((bottom-top-1)*video_num_columns>>1),
+ 			"D" (origin+video_size_row*bottom-4),
+ 			"S" (origin+video_size_row*(bottom-1)-4)
+-			:"ax","cx","di","si");
++			);
+ 	}
+ 	else		/* Not EGA/VGA */
+ 	{
+@@ -275,14 +275,14 @@
+ 			"rep\n\t"
+ 			"movsl\n\t"
+ 			"addl $2,%%edi\n\t"	/* %edi has been decremented by 4 */
+-			"movl _video_num_columns,%%ecx\n\t"
++			"movl video_num_columns,%%ecx\n\t"
+ 			"rep\n\t"
+ 			"stosw"
+ 			::"a" (video_erase_char),
+ 			"c" ((bottom-top-1)*video_num_columns>>1),
+ 			"D" (origin+video_size_row*bottom-4),
+ 			"S" (origin+video_size_row*(bottom-1)-4)
+-			:"ax","cx","di","si");
++			);
+ 	}
+ }
+ 
+@@ -323,8 +323,8 @@
+ 
+ static void csi_J(int currcons, int vpar)
+ {
+-	long count __asm__("cx");
+-	long start __asm__("di");
++	long count; //__asm__("cx");
++	long start; //__asm__("di");
+ 
+ 	switch (vpar) {
+ 		case 0:	/* erase from cursor to end of display */
+@@ -347,13 +347,13 @@
+ 		"stosw\n\t"
+ 		::"c" (count),
+ 		"D" (start),"a" (video_erase_char)
+-		:"cx","di");
++		);
+ }
+ 
+ static void csi_K(int currcons, int vpar)
+ {
+-	long count __asm__("cx");
+-	long start __asm__("di");
++	long count; //__asm__("cx");
++	long start; //__asm__("di");
+ 
+ 	switch (vpar) {
+ 		case 0:	/* erase from cursor to end of line */
+@@ -378,7 +378,7 @@
+ 		"stosw\n\t"
+ 		::"c" (count),
+ 		"D" (start),"a" (video_erase_char)
+-		:"cx","di");
++		);
+ }
+ 
+ void csi_m(int currcons )
+@@ -601,7 +601,7 @@
+ 						::"a" (translate[c-32]),
+ 						"m" (*(short *)pos),
+ 						"m" (attr)
+-						:"ax");
++						);
+ 					pos += 2;
+ 					x++;
+ 				} else if (c==27)
+@@ -1017,7 +1017,7 @@
+ 			::"a" (c),
+ 			"m" (*(short *)pos),
+ 			"m" (attr)
+-			:"ax");
++			);
+ 		pos += 2;
+ 		x++;
+ 	}
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/keyboard.S patch-new/linux-0.12/kernel/chr_drv/keyboard.S
+--- patch-old/linux-0.12/kernel/chr_drv/keyboard.S	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/chr_drv/keyboard.S	2026-04-04 13:12:07
+@@ -15,10 +15,13 @@
+  * KBD_GR for German keyboards
+  * KBD_FR for Frech keyboard
+  */
+-#define KBD_FINNISH
+ 
++#define KBD_US
++
++#include <linux/config.h>
++
+ .text
+-.globl _keyboard_interrupt
++.globl keyboard_interrupt
+ 
+ /*
+  * these are for the keyboard read functions
+@@ -39,7 +42,7 @@
+  *  keyboard scan-code and converts it into the appropriate
+  *  ascii character(s).
+  */
+-_keyboard_interrupt:
++keyboard_interrupt:
+ 	pushl %eax
+ 	pushl %ebx
+ 	pushl %ecx
+@@ -49,15 +52,15 @@
+ 	movl $0x10,%eax
+ 	mov %ax,%ds
+ 	mov %ax,%es
+-	movl _blankinterval,%eax
+-	movl %eax,_blankcount
++	movl blankinterval,%eax
++	movl %eax,blankcount
+ 	xorl %eax,%eax		/* %eax is scan code */
+ 	inb $0x60,%al
+ 	cmpb $0xe0,%al
+ 	je set_e0
+ 	cmpb $0xe1,%al
+ 	je set_e1
+-	call key_table(,%eax,4)
++	call *key_table(,%eax,4)
+ 	movb $0,e0
+ e0_e1:	inb $0x61,%al
+ 	jmp 1f
+@@ -73,7 +76,7 @@
+ 	movb $0x20,%al
+ 	outb %al,$0x20
+ 	pushl $0
+-	call _do_tty_interrupt
++	call do_tty_interrupt
+ 	addl $4,%esp
+ 	pop %es
+ 	pop %ds
+@@ -95,7 +98,7 @@
+ put_queue:
+ 	pushl %ecx
+ 	pushl %edx
+-	movl _table_list,%edx		# read-queue for console
++	movl table_list,%edx		# read-queue for console
+ 	movl head(%edx),%ecx
+ 1:	movb %al,buf(%edx,%ecx)
+ 	incl %ecx
+@@ -164,9 +167,9 @@
+ scroll:
+ 	testb $0x03,mode
+ 	je 1f
+-	call _show_mem
++	call show_mem
+ 	jmp 2f
+-1:	call _show_state
++1:	call show_state
+ 2:	xorb $1,leds
+ 	jmp set_leds
+ num:	xorb $2,leds
+@@ -239,7 +242,7 @@
+ 	jmp put_queue
+ alt_func:
+ 	pushl %eax
+-	call _change_console
++	call change_console
+ 	popl %eax
+ end_func:
+ 	ret
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/rs_io.s patch-new/linux-0.12/kernel/chr_drv/rs_io.s
+--- patch-old/linux-0.12/kernel/chr_drv/rs_io.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/chr_drv/rs_io.s	2026-04-04 13:12:07
+@@ -11,7 +11,7 @@
+  */
+ 
+ .text
+-.globl _rs1_interrupt,_rs2_interrupt
++.globl rs1_interrupt,rs2_interrupt
+ 
+ size	= 1024				/* must be power of two !
+ 					   and must match the value
+@@ -31,12 +31,12 @@
+  * the interrupt is coming from, and take appropriate action.
+  */
+ .align 2
+-_rs1_interrupt:
+-	pushl $_table_list+8
++rs1_interrupt:
++	pushl $table_list+8
+ 	jmp rs_int
+ .align 2
+-_rs2_interrupt:
+-	pushl $_table_list+16
++rs2_interrupt:
++	pushl $table_list+16
+ rs_int:
+ 	pushl %edx
+ 	pushl %ecx
+@@ -62,7 +62,7 @@
+ 	movl 24(%esp),%ecx
+ 	pushl %edx
+ 	subl $2,%edx
+-	call jmp_table(,%eax,2)		/* NOTE! not *4, bit0 is 0 already */
++	call *jmp_table(,%eax,2)		/* NOTE! not *4, bit0 is 0 already */
+ 	popl %edx
+ 	jmp rep_int
+ end:	movb $0x20,%al
+@@ -95,7 +95,7 @@
+ read_char:
+ 	inb %dx,%al
+ 	movl %ecx,%edx
+-	subl $_table_list,%edx
++	subl $table_list,%edx
+ 	shrl $3,%edx
+ 	movl (%ecx),%ecx		# read-queue
+ 	movl head(%ecx),%ebx
+@@ -107,7 +107,7 @@
+ 	movl %ebx,head(%ecx)
+ 1:	addl $63,%edx
+ 	pushl %edx
+-	call _do_tty_interrupt
++	call do_tty_interrupt
+ 	addl $4,%esp
+ 	ret
+ 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/tty_io.c patch-new/linux-0.12/kernel/chr_drv/tty_io.c
+--- patch-old/linux-0.12/kernel/chr_drv/tty_io.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/chr_drv/tty_io.c	2026-04-04 13:12:07
+@@ -479,6 +479,6 @@
+ 		};
+ 	}
+ 	rs_init();
+-	printk("%d virtual consoles\n\r",NR_CONSOLES);
+-	printk("%d pty's\n\r",NR_PTYS);
++	printk("\t%d virtual consoles\n\r", NR_CONSOLES);
++	printk("\t%d pty's\n\r", NR_PTYS);
+ }
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/exit.c patch-new/linux-0.12/kernel/exit.c
+--- patch-old/linux-0.12/kernel/exit.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/exit.c	2026-04-04 13:12:07
+@@ -259,7 +259,7 @@
+ 	return(0);
+ }
+ 
+-volatile void do_exit(long code)
++void do_exit(long code) 
+ {
+ 	struct task_struct *p;
+ 	int i;
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/fork.c patch-new/linux-0.12/kernel/fork.c
+--- patch-old/linux-0.12/kernel/fork.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/fork.c	2026-04-04 13:12:07
+@@ -36,6 +36,7 @@
+ 	}
+ }
+ 
++//
+ int copy_mem(int nr,struct task_struct * p)
+ {
+ 	unsigned long old_data_base,new_data_base,data_limit;
+@@ -78,7 +79,9 @@
+ 	if (!p)
+ 		return -EAGAIN;
+ 	task[nr] = p;
++    asm("cld");     /* NOTE! */
+ 	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
++    //memcpy(p, current, sizeof(struct task_struct));
+ 	p->state = TASK_UNINTERRUPTIBLE;
+ 	p->pid = last_pid;
+ 	p->counter = p->priority;
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/math/Makefile patch-new/linux-0.12/kernel/math/Makefile
+--- patch-old/linux-0.12/kernel/math/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/math/Makefile	2026-04-04 13:12:07
+@@ -6,78 +6,35 @@
+ # unless it's something special (ie not a .c file).
+ #
+ 
+-AR	=gar
+-AS	=gas
+-LD	=gld
+-LDFLAGS	=-s -x
+-CC	=gcc
+-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs \
+-	-finline-functions -mstring-insns -nostdinc -I../../include
+-CPP	=gcc -E -nostdinc -I../../include
++include ../../Makefile.header
+ 
++CFLAGS	+= -I../../include
++CPP	+= -I../../include
++
+ .c.s:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-S -o $*.s $<
+ .s.o:
+-	$(AS) -c -o $*.o $<
++	@$(AS) -o $*.o $<
+ .c.o:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-c -o $*.o $<
+ 
+-OBJS  = math_emulate.o error.o convert.o ea.o get_put.o \
+-	add.o mul.o div.o compare.o
++OBJS  = math_emulate.o add.o convert.o ea.o get_put.o \
++		compare.o div.o error.o mul.o
+ 
+ math.a: $(OBJS)
+-	$(AR) rcs math.a $(OBJS)
+-	sync
++	@$(AR) rcs math.a $(OBJS)
++	@sync
+ 
+ clean:
+-	rm -f core *.o *.a tmp_make
+-	for i in *.c;do rm -f `basename $$i .c`.s;done
++	@rm -f core *.o *.a tmp_make
++	@for i in *.c;do rm -f `basename $$i .c`.s;done
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
+ 		$(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
++	@cp tmp_make Makefile
+ 
+ ### Dependencies:
+-add.s add.o : add.c ../../include/linux/math_emu.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h 
+-compare.s compare.o : compare.c ../../include/linux/math_emu.h \
+-  ../../include/linux/sched.h ../../include/linux/head.h \
+-  ../../include/linux/fs.h ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h 
+-convert.s convert.o : convert.c ../../include/linux/math_emu.h \
+-  ../../include/linux/sched.h ../../include/linux/head.h \
+-  ../../include/linux/fs.h ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h 
+-div.s div.o : div.c ../../include/linux/math_emu.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h 
+-ea.s ea.o : ea.c ../../include/stddef.h ../../include/linux/math_emu.h \
+-  ../../include/linux/sched.h ../../include/linux/head.h \
+-  ../../include/linux/fs.h ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h \
+-  ../../include/asm/segment.h 
+-error.s error.o : error.c ../../include/signal.h ../../include/sys/types.h \
+-  ../../include/linux/sched.h ../../include/linux/head.h \
+-  ../../include/linux/fs.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h 
+-get_put.s get_put.o : get_put.c ../../include/signal.h ../../include/sys/types.h \
+-  ../../include/linux/math_emu.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/linux/mm.h ../../include/linux/kernel.h \
+-  ../../include/asm/segment.h 
+-math_emulate.s math_emulate.o : math_emulate.c ../../include/signal.h \
+-  ../../include/sys/types.h ../../include/linux/math_emu.h \
+-  ../../include/linux/sched.h ../../include/linux/head.h \
+-  ../../include/linux/fs.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/asm/segment.h 
+-mul.s mul.o : mul.c ../../include/linux/math_emu.h ../../include/linux/sched.h \
+-  ../../include/linux/head.h ../../include/linux/fs.h \
+-  ../../include/sys/types.h ../../include/linux/mm.h \
+-  ../../include/linux/kernel.h ../../include/signal.h 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/math/ea.c patch-new/linux-0.12/kernel/math/ea.c
+--- patch-old/linux-0.12/kernel/math/ea.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/math/ea.c	2026-04-04 13:12:07
+@@ -9,7 +9,6 @@
+  */
+ 
+ #include <stddef.h>
+-
+ #include <linux/math_emu.h>
+ #include <asm/segment.h>
+ 
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/panic.c patch-new/linux-0.12/kernel/panic.c
+--- patch-old/linux-0.12/kernel/panic.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/panic.c	2026-04-04 13:12:07
+@@ -13,9 +13,9 @@
+ 
+ void sys_sync(void);	/* it's really int */
+ 
+-volatile void panic(const char * s)
++void panic(const char * s)
+ {
+-	printk("Kernel panic: %s\n\r",s);
++	printk("Kernel panic: %s\n\r", s);
+ 	if (current == task[0])
+ 		printk("In swapper task - not syncing\n\r");
+ 	else
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/sched.c patch-new/linux-0.12/kernel/sched.c
+--- patch-old/linux-0.12/kernel/sched.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/sched.c	2026-04-04 13:12:07
+@@ -17,7 +17,7 @@
+ #include <asm/system.h>
+ #include <asm/io.h>
+ #include <asm/segment.h>
+-
++//#include <sys/time.h>
+ #include <signal.h>
+ 
+ #define _S(nr) (1<<((nr)-1))
+@@ -68,11 +68,13 @@
+ 
+ unsigned long volatile jiffies=0;
+ unsigned long startup_time=0;
+-int jiffies_offset = 0;		/* # clock ticks to add to get "true
+-				   time".  Should always be less than
+-				   1 second's worth.  For time fanatics
+-				   who like to syncronize their machines
+-				   to WWV :-) */
++int jiffies_offset = 0;		
++/* 
++ * # clock ticks to add to get "true time".  
++ * Should always be less than 1 second's worth.  
++ * For time fanatics who like to syncronize 
++ * their machines to WWV :-) 
++ * */
+ 
+ struct task_struct *current = &(init_task.task);
+ struct task_struct *last_task_used_math = NULL;
+@@ -161,6 +163,7 @@
+ 	switch_to(next);
+ }
+ 
++//
+ int sys_pause(void)
+ {
+ 	current->state = TASK_INTERRUPTIBLE;
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/sys_call.s patch-new/linux-0.12/kernel/sys_call.s
+--- patch-old/linux-0.12/kernel/sys_call.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/kernel/sys_call.s	2026-04-04 13:12:07
+@@ -68,9 +68,9 @@
+  * Ok, I get parallel printer interrupts while using the floppy for some
+  * strange reason. Urgel. Now I just ignore them.
+  */
+-.globl _system_call,_sys_fork,_timer_interrupt,_sys_execve
+-.globl _hd_interrupt,_floppy_interrupt,_parallel_interrupt
+-.globl _device_not_available, _coprocessor_error
++.globl system_call,sys_fork,timer_interrupt,sys_execve
++.globl hd_interrupt,floppy_interrupt,parallel_interrupt
++.globl device_not_available, coprocessor_error
+ 
+ .align 2
+ bad_sys_call:
+@@ -79,34 +79,34 @@
+ .align 2
+ reschedule:
+ 	pushl $ret_from_sys_call
+-	jmp _schedule
++	jmp schedule
+ .align 2
+-_system_call:
++system_call:
+ 	push %ds
+ 	push %es
+ 	push %fs
+-	pushl %eax		# save the orig_eax
++	pushl %eax		        # save the orig_eax
+ 	pushl %edx		
+-	pushl %ecx		# push %ebx,%ecx,%edx as parameters
+-	pushl %ebx		# to the system call
+-	movl $0x10,%edx		# set up ds,es to kernel space
++	pushl %ecx		        # push %ebx,%ecx,%edx as parameters
++	pushl %ebx		        # to the system call
++	movl $0x10,%edx		    # set up ds,es to kernel space
+ 	mov %dx,%ds
+ 	mov %dx,%es
+-	movl $0x17,%edx		# fs points to local data space
++	movl $0x17,%edx		    # fs points to local data space
+ 	mov %dx,%fs
+-	cmpl _NR_syscalls,%eax
++	cmpl NR_syscalls,%eax
+ 	jae bad_sys_call
+-	call _sys_call_table(,%eax,4)
++	call *sys_call_table(,%eax,4)
+ 	pushl %eax
+ 2:
+-	movl _current,%eax
++	movl current,%eax
+ 	cmpl $0,state(%eax)		# state
+ 	jne reschedule
+-	cmpl $0,counter(%eax)		# counter
++	cmpl $0,counter(%eax)	# counter
+ 	je reschedule
+ ret_from_sys_call:
+-	movl _current,%eax
+-	cmpl _task,%eax			# task[0] cannot have signals
++	movl current,%eax
++	cmpl task,%eax			# task[0] cannot have signals
+ 	je 3f
+ 	cmpw $0x0f,CS(%esp)		# was old code segment supervisor ?
+ 	jne 3f
+@@ -122,7 +122,7 @@
+ 	movl %ebx,signal(%eax)
+ 	incl %ecx
+ 	pushl %ecx
+-	call _do_signal
++	call do_signal
+ 	popl %ecx
+ 	testl %eax, %eax
+ 	jne 2b		# see if we need to switch tasks, or do more signals
+@@ -137,7 +137,7 @@
+ 	iret
+ 
+ .align 2
+-_coprocessor_error:
++coprocessor_error:
+ 	push %ds
+ 	push %es
+ 	push %fs
+@@ -152,10 +152,10 @@
+ 	movl $0x17,%eax
+ 	mov %ax,%fs
+ 	pushl $ret_from_sys_call
+-	jmp _math_error
++	jmp math_error
+ 
+ .align 2
+-_device_not_available:
++device_not_available:
+ 	push %ds
+ 	push %es
+ 	push %fs
+@@ -173,12 +173,12 @@
+ 	clts				# clear TS so that we can use math
+ 	movl %cr0,%eax
+ 	testl $0x4,%eax			# EM (math emulation bit)
+-	je _math_state_restore
++	je math_state_restore
+ 	pushl %ebp
+ 	pushl %esi
+ 	pushl %edi
+ 	pushl $0		# temporary storage for ORIG_EIP
+-	call _math_emulate
++	call math_emulate
+ 	addl $4,%esp
+ 	popl %edi
+ 	popl %esi
+@@ -186,7 +186,7 @@
+ 	ret
+ 
+ .align 2
+-_timer_interrupt:
++timer_interrupt:
+ 	push %ds		# save ds,es and put kernel data space
+ 	push %es		# into them. %fs is used by _system_call
+ 	push %fs
+@@ -200,27 +200,27 @@
+ 	mov %ax,%es
+ 	movl $0x17,%eax
+ 	mov %ax,%fs
+-	incl _jiffies
++	incl jiffies
+ 	movb $0x20,%al		# EOI to interrupt controller #1
+ 	outb %al,$0x20
+ 	movl CS(%esp),%eax
+ 	andl $3,%eax		# %eax is CPL (0 or 3, 0=supervisor)
+ 	pushl %eax
+-	call _do_timer		# 'do_timer(long CPL)' does everything from
++	call do_timer		# 'do_timer(long CPL)' does everything from
+ 	addl $4,%esp		# task switching to accounting ...
+ 	jmp ret_from_sys_call
+ 
+ .align 2
+-_sys_execve:
++sys_execve:
+ 	lea EIP(%esp),%eax
+ 	pushl %eax
+-	call _do_execve
++	call do_execve
+ 	addl $4,%esp
+ 	ret
+ 
+ .align 2
+-_sys_fork:
+-	call _find_empty_process
++sys_fork:
++	call find_empty_process
+ 	testl %eax,%eax
+ 	js 1f
+ 	push %gs
+@@ -228,11 +228,11 @@
+ 	pushl %edi
+ 	pushl %ebp
+ 	pushl %eax
+-	call _copy_process
++	call copy_process
+ 	addl $20,%esp
+ 1:	ret
+ 
+-_hd_interrupt:
++hd_interrupt:
+ 	pushl %eax
+ 	pushl %ecx
+ 	pushl %edx
+@@ -249,11 +249,11 @@
+ 	jmp 1f			# give port chance to breathe
+ 1:	jmp 1f
+ 1:	xorl %edx,%edx
+-	movl %edx,_hd_timeout
+-	xchgl _do_hd,%edx
++	movl %edx,hd_timeout
++	xchgl do_hd,%edx
+ 	testl %edx,%edx
+ 	jne 1f
+-	movl $_unexpected_hd_interrupt,%edx
++	movl $unexpected_hd_interrupt,%edx
+ 1:	outb %al,$0x20
+ 	call *%edx		# "interesting" way of handling intr.
+ 	pop %fs
+@@ -264,7 +264,7 @@
+ 	popl %eax
+ 	iret
+ 
+-_floppy_interrupt:
++floppy_interrupt:
+ 	pushl %eax
+ 	pushl %ecx
+ 	pushl %edx
+@@ -279,10 +279,10 @@
+ 	movb $0x20,%al
+ 	outb %al,$0x20		# EOI to interrupt controller #1
+ 	xorl %eax,%eax
+-	xchgl _do_floppy,%eax
++	xchgl do_floppy,%eax
+ 	testl %eax,%eax
+ 	jne 1f
+-	movl $_unexpected_floppy_interrupt,%eax
++	movl $unexpected_floppy_interrupt,%eax
+ 1:	call *%eax		# "interesting" way of handling intr.
+ 	pop %fs
+ 	pop %es
+@@ -292,7 +292,7 @@
+ 	popl %eax
+ 	iret
+ 
+-_parallel_interrupt:
++parallel_interrupt:
+ 	pushl %eax
+ 	movb $0x20,%al
+ 	outb %al,$0x20
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/lib/Makefile patch-new/linux-0.12/lib/Makefile
+--- patch-old/linux-0.12/lib/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/lib/Makefile	2026-04-04 13:12:07
+@@ -6,40 +6,36 @@
+ # unless it's something special (ie not a .c file).
+ #
+ 
+-AR	=gar
+-AS	=gas
+-LD	=gld
+-LDFLAGS	=-s -x
+-CC	=gcc
+-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs \
+-	-finline-functions -mstring-insns -nostdinc -I../include
+-CPP	=gcc -E -nostdinc -I../include
++include ../Makefile.header
+ 
++CFLAGS	+= -I../include
++CPP	+= -I../include
++
+ .c.s:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-S -o $*.s $<
+ .s.o:
+-	$(AS) -c -o $*.o $<
++	@$(AS) -o $*.o $<
+ .c.o:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-c -o $*.o $<
+ 
+ OBJS  = ctype.o _exit.o open.o close.o errno.o write.o dup.o setsid.o \
+ 	execve.o wait.o string.o malloc.o
+ 
+ lib.a: $(OBJS)
+-	$(AR) rcs lib.a $(OBJS)
+-	sync
++	@$(AR) rcs lib.a $(OBJS)
++	@sync
+ 
+ clean:
+-	rm -f core *.o *.a tmp_make
+-	for i in *.c;do rm -f `basename $$i .c`.s;done
++	@rm -f core *.o *.a tmp_make
++	@for i in *.c;do rm -f `basename $$i .c`.s;done
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in *.c;do echo -n `echo $$i | sed 's,\.c,\.s,'`" "; \
+ 		$(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
++	@cp tmp_make Makefile
+ 
+ ### Dependencies:
+ _exit.s _exit.o : _exit.c ../include/unistd.h ../include/sys/stat.h \
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/lib/_exit.c patch-new/linux-0.12/lib/_exit.c
+--- patch-old/linux-0.12/lib/_exit.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/lib/_exit.c	2026-04-04 13:12:07
+@@ -7,7 +7,7 @@
+ #define __LIBRARY__
+ #include <unistd.h>
+ 
+-volatile void _exit(int exit_code)
++void _exit(int exit_code)
+ {
+ 	__asm__("int $0x80"::"a" (__NR_exit),"b" (exit_code));
+ }
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/lib/malloc.c patch-new/linux-0.12/lib/malloc.c
+--- patch-old/linux-0.12/lib/malloc.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/lib/malloc.c	2026-04-04 13:12:07
+@@ -144,7 +144,7 @@
+ 	 * allocate a new one.
+ 	 */
+ 	if (!bdesc) {
+-		char		*cp;
++		char	*cp;
+ 		int		i;
+ 
+ 		if (!free_bucket_desc)	
+@@ -153,7 +153,7 @@
+ 		free_bucket_desc = bdesc->next;
+ 		bdesc->refcnt = 0;
+ 		bdesc->bucket_size = bdir->size;
+-		bdesc->page = bdesc->freeptr = (void *) cp = get_free_page();
++		bdesc->page = bdesc->freeptr = (void *) (cp = (char *)get_free_page());
+ 		if (!cp)
+ 			panic("Out of memory in kernel malloc()");
+ 		/* Set up the chain of free objects */
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/Makefile patch-new/linux-0.12/mm/Makefile
+--- patch-old/linux-0.12/mm/Makefile	2026-04-04 13:12:07
++++ patch-new/linux-0.12/mm/Makefile	2026-04-04 13:12:07
+@@ -1,44 +1,37 @@
+-CC	=gcc
+-CFLAGS	=-O -Wall -fstrength-reduce -fcombine-regs -fomit-frame-pointer \
+-	-finline-functions -nostdinc -I../include
+-AS	=gas
+-AR	=gar
+-LD	=gld
+-CPP	=gcc -E -nostdinc -I../include
+ 
++include ../Makefile.header
++
++LDFLAGS += -r
++CFLAGS	+= -I../include
++CPP	+= -I../include
++
+ .c.o:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-c -o $*.o $<
+ .s.o:
+-	$(AS) -o $*.o $<
++	@$(AS) -o $*.o $<
+ .c.s:
+-	$(CC) $(CFLAGS) \
++	@$(CC) $(CFLAGS) \
+ 	-S -o $*.s $<
+ 
+-OBJS	= memory.o swap.o page.o
++OBJS	= memory.o page.o swap.o 
+ 
+ all: mm.o
+ 
+ mm.o: $(OBJS)
+-	$(LD) -r -o mm.o $(OBJS)
++	@$(LD) $(LDFLAGS) -o mm.o $(OBJS)
+ 
+ clean:
+-	rm -f core *.o *.a tmp_make
+-	for i in *.c;do rm -f `basename $$i .c`.s;done
++	@rm -f core *.o *.a tmp_make
++	@for i in *.c;do rm -f `basename $$i .c`.s;done
+ 
+ dep:
+-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
+-	(for i in *.c;do $(CPP) -M $$i;done) >> tmp_make
+-	cp tmp_make Makefile
++	@sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
++	@(for i in *.c;do $(CPP) -M $$i;done) >> tmp_make
++	@cp tmp_make Makefile
+ 
+ ### Dependencies:
+-memory.o : memory.c ../include/signal.h ../include/sys/types.h \
+-  ../include/asm/system.h ../include/linux/sched.h ../include/linux/head.h \
+-  ../include/linux/fs.h ../include/linux/mm.h ../include/linux/kernel.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h 
+-swap.o : swap.c ../include/string.h ../include/linux/sched.h \
+-  ../include/linux/head.h ../include/linux/fs.h ../include/sys/types.h \
+-  ../include/linux/mm.h ../include/linux/kernel.h ../include/signal.h \
+-  ../include/sys/param.h ../include/sys/time.h ../include/time.h \
+-  ../include/sys/resource.h 
++memory.o: memory.c ../include/signal.h ../include/sys/types.h \
++  ../include/asm/system.h ../include/linux/sched.h \
++  ../include/linux/head.h ../include/linux/fs.h ../include/linux/mm.h \
++  ../include/linux/kernel.h
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/memory.c patch-new/linux-0.12/mm/memory.c
+--- patch-old/linux-0.12/mm/memory.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/mm/memory.c	2026-04-04 13:12:07
+@@ -29,22 +29,22 @@
+  */
+ 
+ #include <signal.h>
+-
+ #include <asm/system.h>
+-
++#include <linux/mm.h>
+ #include <linux/sched.h>
+ #include <linux/head.h>
+ #include <linux/kernel.h>
+ 
++/* */
+ #define CODE_SPACE(addr) ((((addr)+4095)&~4095) < \
+ current->start_code + current->end_code)
+ 
+ unsigned long HIGH_MEMORY = 0;
+ 
+ #define copy_page(from,to) \
+-__asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024):"cx","di","si")
++__asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024))
+ 
+-unsigned char mem_map [ PAGING_PAGES ] = {0,};
++unsigned char mem_map[ PAGING_PAGES ] = {0,};
+ 
+ /*
+  * Free a page of memory at physical address 'addr'. Used by
+@@ -57,8 +57,9 @@
+ 		panic("trying to free nonexistent page");
+ 	addr -= LOW_MEM;
+ 	addr >>= 12;
+-	if (mem_map[addr]--) return;
+-	mem_map[addr]=0;
++	if (mem_map[addr]--) 
++        return;
++	mem_map[addr] = 0;
+ 	panic("trying to free free page");
+ }
+ 
+@@ -99,7 +100,7 @@
+ }
+ 
+ /*
+- *  Well, here is one of the most complicated functions in mm. It
++ * Well, here is one of the most complicated functions in mm. It
+  * copies a range of linerar addresses by copying only the pages.
+  * Let's hope this is bug-free, 'cause this one I don't want to debug :-)
+  *
+@@ -124,6 +125,7 @@
+ 	unsigned long new_page;
+ 	unsigned long nr;
+ 
++    // MUST be divided by 4MB
+ 	if ((from&0x3fffff) || (to&0x3fffff))
+ 		panic("copy_page_tables called with wrong alignment");
+ 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
+@@ -440,18 +442,24 @@
+ 	oom();
+ }
+ 
++/*
++ *
++ *
++ */
+ void mem_init(long start_mem, long end_mem)
+ {
+ 	int i;
+ 
+ 	HIGH_MEMORY = end_mem;
+-	for (i=0 ; i<PAGING_PAGES ; i++)
++	for (i = 0; i < PAGING_PAGES; i++)
+ 		mem_map[i] = USED;
+ 	i = MAP_NR(start_mem);
+ 	end_mem -= start_mem;
+ 	end_mem >>= 12;
+-	while (end_mem-->0)
+-		mem_map[i++]=0;
++	while (end_mem-- > 0)
++    {
++	    mem_map[i++] = 0;
++    }
+ }
+ 
+ void show_mem(void)
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/page.s patch-new/linux-0.12/mm/page.s
+--- patch-old/linux-0.12/mm/page.s	2026-04-04 13:12:07
++++ patch-new/linux-0.12/mm/page.s	2026-04-04 13:12:07
+@@ -9,9 +9,9 @@
+  * the real work is done in mm.c
+  */
+ 
+-.globl _page_fault
++.globl page_fault
+ 
+-_page_fault:
++page_fault:
+ 	xchgl %eax,(%esp)
+ 	pushl %ecx
+ 	pushl %edx
+@@ -27,9 +27,9 @@
+ 	pushl %eax
+ 	testl $1,%eax
+ 	jne 1f
+-	call _do_no_page
++	call do_no_page
+ 	jmp 2f
+-1:	call _do_wp_page
++1:	call do_wp_page
+ 2:	addl $8,%esp
+ 	pop %fs
+ 	pop %es
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/swap.c patch-new/linux-0.12/mm/swap.c
+--- patch-old/linux-0.12/mm/swap.c	2026-04-04 13:12:07
++++ patch-new/linux-0.12/mm/swap.c	2026-04-04 13:12:07
+@@ -188,7 +188,7 @@
+ 		:"=a" (__res)
+ 		:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
+ 		"D" (mem_map+PAGING_PAGES-1)
+-		:"di","cx","dx");
++		);
+ 	if (__res >= HIGH_MEMORY)
+ 		goto repeat;
+ 	if (!__res && swap_out())
+diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/tools/build.sh patch-new/linux-0.12/tools/build.sh
+--- patch-old/linux-0.12/tools/build.sh	1970-01-01 08:00:00
++++ patch-new/linux-0.12/tools/build.sh	2026-04-04 13:12:07
+@@ -0,0 +1,44 @@
++#!/bin/bash
++# build.sh -- a shell version of build.c for the new bootsect.s & setup.s
++# author: falcon <wuzhangjin@gmail.com>
++# update: 2008-10-10
++# change: 2020-02-05
++
++bootsect=$1
++setup=$2
++system=$3
++IMAGE=$4
++root_dev=$5
++
++# Set the biggest sys_size
++# system module will not be greater than 0x9000 section(unit is 16bytes),
++# Because bootsect and setup code will start from 0x90000 after move.
++# But to be safe, we only set it to 0x8000.
++SYS_SIZE=$((0x8000*16))
++
++# set the default "device" file for root image file
++if [ -z "$root_dev" ]; then
++	DEFAULT_MAJOR_ROOT=3
++	DEFAULT_MINOR_ROOT=1
++else
++	DEFAULT_MAJOR_ROOT=${root_dev:0:2}
++	DEFAULT_MINOR_ROOT=${root_dev:2:3}
++fi
++
++# Write bootsect (512 bytes, one sector) to stdout
++[ ! -f "$bootsect" ] && echo "there is no bootsect binary file there" && exit -1
++dd if=$bootsect bs=512 count=1 of=$IMAGE 2>&1 >/dev/null
++
++# Write setup(4 * 512bytes, four sectors) to stdout
++[ ! -f "$setup" ] && echo "there is no setup binary file there" && exit -1
++dd if=$setup seek=1 bs=512 count=4 of=$IMAGE 2>&1 >/dev/null
++
++# Write system(< SYS_SIZE) to stdout
++[ ! -f "$system" ] && echo "there is no system binary file there" && exit -1
++system_size=`wc -c $system |cut -d" " -f1`
++[ $system_size -gt $SYS_SIZE ] && echo "the system binary is too big" && exit -1
++# 2880 is the total number of sectors for 1.44MB floppy.
++dd if=$system seek=5 bs=512 count=$((2880-1-4)) of=$IMAGE 2>&1 >/dev/null
++
++# Set "device" for the root image file
++echo -ne "\x$DEFAULT_MINOR_ROOT\x$DEFAULT_MAJOR_ROOT" | dd ibs=1 obs=1 count=2 seek=508 of=$IMAGE conv=notrunc  2>&1 >/dev/null
