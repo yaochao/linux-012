@@ -83,7 +83,9 @@ class QemuDriverTest(unittest.TestCase):
         self.assertEqual(root / "rebuild" / "out" / "images" / "bootimage-0.12-hd", paths.boot_source_image)
         self.assertEqual(root / "rebuild" / "out" / "images" / "hdc-0.12.img", paths.hard_disk_image)
         self.assertEqual(root / "out" / "verify" / "boot.img", paths.boot_floppy_image)
-        self.assertEqual(root / "out" / "verify" / "m.sock", paths.monitor_socket)
+        self.assertIsNotNone(paths.monitor_socket)
+        self.assertEqual("m.log", paths.monitor_log.name)
+        self.assertTrue(paths.monitor_socket.name.endswith(".sock"))
 
     def test_driver_paths_use_override_images_from_environment(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
@@ -107,6 +109,13 @@ class QemuDriverTest(unittest.TestCase):
         self.assertEqual("127.0.0.1", paths.monitor_host)
         self.assertGreater(paths.monitor_port, 0)
         self.assertTrue(paths.monitor_address.startswith("tcp:127.0.0.1:"))
+
+    def test_driver_paths_keep_unix_monitor_socket_path_short(self) -> None:
+        root = pathlib.Path("/tmp") / ("linux-012-" + ("deep" * 30))
+        paths = DriverPaths.from_root(root, platform=resolve_host_platform("darwin"))
+
+        self.assertIsNotNone(paths.monitor_socket)
+        self.assertLess(len(str(paths.monitor_socket)), 104)
 
     def test_decode_vga_text_buffer_returns_visible_text(self) -> None:
         data = bytearray(b" " * 4000)

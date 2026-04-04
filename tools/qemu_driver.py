@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shlex
 import shutil
@@ -8,6 +9,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,7 +64,7 @@ class DriverPaths:
         monitor_host: str | None
         monitor_port: int | None
         if host.monitor_kind == "unix":
-            monitor_socket = out_dir / "m.sock"
+            monitor_socket = unix_monitor_socket(root, session)
             monitor_host = None
             monitor_port = None
             monitor_address = f"unix:{monitor_socket},server=on,wait=off"
@@ -94,6 +96,11 @@ class DriverPaths:
             monitor_log=out_dir / "m.log",
             screen_text=out_dir / "screen.txt",
         )
+
+
+def unix_monitor_socket(root: Path, session: str) -> Path:
+    digest = hashlib.sha1(f"{root}:{session}".encode("utf-8")).hexdigest()[:12]
+    return Path(tempfile.gettempdir()) / f"l012-{session}-{digest}.sock"
 
 
 def resolve_runtime_image(env_name: str, default: Path) -> Path:

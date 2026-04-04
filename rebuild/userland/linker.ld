@@ -4,7 +4,7 @@ SECTIONS
 {
     . = 0;
     .text : { *(.text*) *(.rodata*) }
-    . = ALIGN(4);
+    . = ALIGN(1024);
     __data_start = .;
     .data : { *(.data*) }
     . = ALIGN(4);

@@ -6,6 +6,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class UserlandSourceTest(unittest.TestCase):
+    def test_crt0_reads_linux012_stack_as_argc_argv_envp_triplet(self) -> None:
+        text = (ROOT / "rebuild" / "userland" / "src" / "crt0.S").read_text(encoding="utf-8")
+
+        self.assertIn("popl %eax", text)
+        self.assertIn("popl %ebx", text)
+        self.assertIn("popl %ecx", text)
+        self.assertNotIn("movl %esp, %ebx", text)
+
     def test_linux012_header_declares_14_char_directory_entries(self) -> None:
         text = (ROOT / "rebuild" / "userland" / "include" / "linux012.h").read_text(encoding="utf-8")
 

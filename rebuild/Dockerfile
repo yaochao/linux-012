@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     file \
     gcc-multilib \
+    libc6-dev-i386 \
     libguestfs-tools \
     linux-image-kvm \
     patch \

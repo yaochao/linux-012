@@ -1,8 +1,8 @@
     .globl _start
 _start:
     popl %eax
-    movl %esp, %ebx
-    leal 4(%esp,%eax,4), %ecx
+    popl %ebx
+    popl %ecx
     pushl %ecx
     pushl %ebx
     pushl %eax

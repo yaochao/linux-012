@@ -47,15 +47,20 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertEqual(str(paths.boot_image), env["LINUX012_BOOT_SOURCE_IMAGE"])
         self.assertEqual(str(paths.hard_disk_image), env["LINUX012_HARD_DISK_IMAGE"])
 
-    def test_build_script_references_source_tarball_and_patch_directory(self) -> None:
+    def test_build_script_references_source_tarball_userland_and_manifest(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]
         text = (root / "rebuild" / "container" / "build_images.sh").read_text()
 
         self.assertIn("vendor/src/linux-0.12.tar.gz", text)
         self.assertIn("rebuild/patches/linux-0.12", text)
+        self.assertIn("rebuild/userland", text)
+        self.assertIn("rebuild/tools/aout_pack.py", text)
+        self.assertIn("rebuild/rootfs/manifest/directories.txt", text)
+        self.assertIn("rebuild/rootfs/manifest/devices.tsv", text)
         self.assertIn("bootimage-0.12-hd", text)
         self.assertIn("guestfish", text)
         self.assertIn("/tmp/linux-012-rebuild-work", text)
+        self.assertNotIn("base.tar", text)
         self.assertNotIn("mount -t minix", text)
 
     def test_build_script_formats_minix_v1_with_14_character_names(self) -> None:
@@ -64,10 +69,19 @@ class RebuildDriverTest(unittest.TestCase):
 
         self.assertIn("mkfs.minix -1 -n14", text)
 
-    def test_dockerfile_installs_libguestfs_tools(self) -> None:
+    def test_build_script_stages_rootfs_inside_container_workdir_for_device_nodes(self) -> None:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "rebuild" / "container" / "build_images.sh").read_text()
+
+        self.assertIn('STAGING_DIR="$CONTAINER_WORK_ROOT/rootfs"', text)
+        self.assertIn('USERLAND_BUILD="$CONTAINER_WORK_ROOT/userland"', text)
+
+    def test_dockerfile_installs_multilib_userland_build_dependencies(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]
         text = (root / "rebuild" / "Dockerfile").read_text()
 
+        self.assertIn("gcc-multilib", text)
+        self.assertIn("libc6-dev-i386", text)
         self.assertIn("libguestfs-tools", text)
         self.assertIn("linux-image-kvm", text)
 
