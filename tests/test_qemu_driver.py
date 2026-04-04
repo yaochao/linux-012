@@ -10,6 +10,7 @@ from tools.qemu_driver import (
     decode_vga_text_buffer,
     ensure_boot_floppy_image,
     find_stable_prompt,
+    hmp_string,
     monitor_file_path,
     resolve_host_platform,
     resolve_qemu_binary,
@@ -64,6 +65,16 @@ class QemuDriverTest(unittest.TestCase):
         self.assertNotIn("curses", command)
         self.assertNotIn("none", command)
         self.assertTrue(any(item.startswith("tcp:127.0.0.1:") for item in command))
+
+    def test_build_qemu_command_for_verify_mode_uses_daemonize_on_unix_hosts(self) -> None:
+        root = pathlib.Path("/tmp/linux-012")
+        paths = DriverPaths.from_root(root, platform=resolve_host_platform("darwin"))
+
+        command = build_qemu_command(paths=paths, mode="verify", qemu_bin="qemu-system-i386")
+
+        self.assertIn("-daemonize", command)
+        self.assertIn("-display", command)
+        self.assertIn("none", command)
 
     def test_driver_paths_use_runtime_boot_image_and_short_monitor_names(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
@@ -145,11 +156,14 @@ class QemuDriverTest(unittest.TestCase):
 
         self.assertEqual([], decide_next_keys(lines, baseline_prompt="[/]#", ls_sent=False, send_ls=False))
 
-    def test_monitor_file_path_uses_repo_relative_path(self) -> None:
+    def test_monitor_file_path_uses_absolute_path(self) -> None:
         root = pathlib.Path("/tmp/linux-012")
         paths = DriverPaths.from_root(root, platform=resolve_host_platform("darwin"))
 
-        self.assertEqual("out/verify/v.bin", monitor_file_path(paths.vga_dump, root))
+        self.assertEqual(paths.vga_dump.as_posix(), monitor_file_path(paths.vga_dump, root))
+
+    def test_hmp_string_wraps_paths_in_double_quotes(self) -> None:
+        self.assertEqual('"/tmp/linux 012/v.bin"', hmp_string("/tmp/linux 012/v.bin"))
 
     def test_ensure_boot_floppy_image_pads_boot_sector_image_to_full_floppy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

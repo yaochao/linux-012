@@ -21,3 +21,11 @@ This directory stores project-owned historical assets so the repo can run withou
 - QEMU always runs with `-snapshot`, so the vendored disk image remains unchanged across runs.
 - macOS and Ubuntu 22.04 talk to the QEMU monitor through a repo-local Unix socket.
 - Windows 10 uses a localhost TCP monitor endpoint so the same Python automation can drive the guest without Unix socket support.
+
+## Source Rebuild Workflow
+
+- `rebuild/driver.py build` regenerates repo-local replacements for these runtime images under `rebuild/out/images/`.
+- `rebuild/driver.py verify` boots QEMU with the rebuilt images and runs `ls`.
+- `rebuild/driver.py promote` copies the rebuilt images back into `vendor/images/` only after the rebuilt pair has already passed verification.
+
+The provenance above describes the historical source of the initially imported assets. After `promote`, the files in `vendor/images/` become locally rebuilt equivalents with the same filenames and runtime roles.

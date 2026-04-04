@@ -105,12 +105,41 @@ The verification command stores the latest artifacts under `out/verify/`, includ
 
 The interactive launcher uses `out/run/` for the same kind of runtime artifacts.
 
+## Rebuild Runtime Images From Source
+
+The `rebuild/` directory owns the repo-local source rebuild workflow and requires Docker. The boundary of this phase is:
+
+- `bootimage-0.12-hd` is compiled directly from patched Linux 0.12 kernel source
+- `hdc-0.12.img` is rebuilt locally from the committed canonical rootfs baseline plus overlay
+
+This split is intentional because `vendor/src/linux-0.12.tar.gz` contains the kernel source, but not a complete userland with `sh`, `ls`, and the rest of the runtime filesystem.
+
+Common commands:
+
+```sh
+python3 rebuild/driver.py build
+python3 rebuild/driver.py verify
+```
+
+If you want to replace the default runtime images with the rebuilt ones:
+
+```sh
+python3 rebuild/driver.py promote
+```
+
+If you want to refresh the canonical rootfs baseline from the current default hard disk image:
+
+```sh
+python3 rebuild/driver.py capture-rootfs
+```
+
 ## Repo Layout
 
 - `scripts/bootstrap-host.sh`, `scripts/run.sh`, `scripts/verify.sh`: Unix wrappers for macOS and Ubuntu 22.04
 - `scripts/bootstrap-host.ps1`, `scripts/run.ps1`, `scripts/verify.ps1`: PowerShell wrappers for Windows 10
 - `scripts/bootstrap-host.cmd`, `scripts/run.cmd`, `scripts/verify.cmd`: Command Prompt wrappers that delegate to PowerShell
 - `tools/qemu_driver.py`: runtime asset preparation, QEMU discovery, QEMU launch, VGA scraping, and key injection
+- `rebuild/driver.py`: capture the canonical rootfs, rebuild images, verify rebuilt outputs, and promote them into the default runtime path
 - `vendor/src/linux-0.12.tar.gz`: Linux 0.12 source archive
 - `vendor/images/bootimage-0.12-hd`: historical Linux 0.12 boot image for hard-disk-root boot
 - `vendor/images/hdc-0.12.img`: Linux 0.12 hard disk image used as `hda`
@@ -128,3 +157,4 @@ The interactive launcher uses `out/run/` for the same kind of runtime artifacts.
 - `vendor/src/linux-0.12.tar.gz` comes from the kernel.org historic archive.
 - `vendor/images/bootimage-0.12-hd` comes from the OldLinux `linux-0.12-080324.zip` package.
 - `vendor/images/hdc-0.12.img` comes from the `chenzhengchen200821109/linux-0.12` repository, which packages a Linux 0.12 hard disk image for QEMU.
+- `python3 rebuild/driver.py promote` overwrites the default images under `vendor/images/` after the rebuilt outputs have been validated.

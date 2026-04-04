@@ -1,0 +1,27 @@
+diff -ruN patch-qemu/linux-0.12/Makefile.header patch-inline/linux-0.12/Makefile.header
+--- patch-qemu/linux-0.12/Makefile.header	2026-04-04 05:10:32.041284735 +0000
++++ patch-inline/linux-0.12/Makefile.header	2026-04-04 06:18:04.274906005 +0000
+@@ -5,12 +5,12 @@
+ 	LD	= ld
+ 	LDFLAGS = -m elf_i386
+ 	CC	= gcc
+-	CFLAGS  = -g -m32 -fno-builtin -fno-stack-protector -fomit-frame-pointer -fstrength-reduce #-Wall
++	CFLAGS  = -g -m32 -fno-builtin -fno-stack-protector -fgnu89-inline -fno-pie -fno-pic -fomit-frame-pointer -fstrength-reduce #-Wall
+ 	CPP	= cpp -nostdinc
+ 	AR	= ar
+ 	STRIP = strip
+ 	OBJCOPY = objcopy
+-	# we should use -fno-stack-protector with gcc 4.3
++	# we should use -fno-stack-protector -fgnu89-inline -fno-pie -fno-pic with gcc 4.3
+ 	gcc_version=$(shell ls -l `which gcc` | tr '-' '\n' | tail -1)
+ endif
+ 
+@@ -19,7 +19,7 @@
+ 	LD	= i386-elf-ld
+ 	LDFLAGS = -m elf_i386
+ 	CC	= i386-elf-gcc
+-	CFLAGS  = -gdwarf-2 -g3 -m32 -fno-builtin -fno-stack-protector -fomit-frame-pointer -fstrength-reduce #-Wall
++	CFLAGS  = -gdwarf-2 -g3 -m32 -fno-builtin -fno-stack-protector -fgnu89-inline -fno-pie -fno-pic -fomit-frame-pointer -fstrength-reduce #-Wall
+ 	CPP	= i386-elf-cpp -nostdinc
+ 	AR	=i386-elf-ar
+ 	STRIP = i386-elf-strip

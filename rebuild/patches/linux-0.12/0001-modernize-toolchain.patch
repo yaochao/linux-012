@@ -1,6 +1,6 @@
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/Makefile patch-new/linux-0.12/Makefile
---- patch-old/linux-0.12/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/Makefile patch-new/linux-0.12/Makefile
+--- patch-old/linux-0.12/Makefile	1992-01-12 19:48:56.000000000 +0000
++++ patch-new/linux-0.12/Makefile	2026-04-04 05:10:32.041234443 +0000
 @@ -1,27 +1,33 @@
 +OS = Linux
 +
@@ -80,12 +80,12 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  disk: Image
 -	dd bs=8192 if=Image of=/dev/PS0
-+	@dd bs=8192 if=Image of=/dev/fd0
- 
+-
 -tools/build: tools/build.c
 -	$(CC) $(CFLAGS) \
 -	-o tools/build tools/build.c
--
++	@dd bs=8192 if=Image of=/dev/fd0
+ 
  boot/head.o: boot/head.s
 +	@make head.o -C boot/
  
@@ -132,24 +132,24 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  boot/setup: boot/setup.s
 -	$(AS86) -o boot/setup.o boot/setup.s
 -	$(LD86) -s -o boot/setup boot/setup.o
-+	@make setup -C boot
- 
+-
 -boot/setup.s:	boot/setup.S include/linux/config.h
 -	$(CPP) -traditional boot/setup.S -o boot/setup.s
-+boot/bootsect: boot/bootsect.s
-+	@make bootsect -C boot
++	@make setup -C boot
  
 -boot/bootsect.s:	boot/bootsect.S include/linux/config.h
 -	$(CPP) -traditional boot/bootsect.S -o boot/bootsect.s
++boot/bootsect: boot/bootsect.s
++	@make bootsect -C boot
+ 
+-boot/bootsect:	boot/bootsect.s
+-	$(AS86) -o boot/bootsect.o boot/bootsect.s
+-	$(LD86) -s -o boot/bootsect boot/bootsect.o
 +tmp.s:	boot/bootsect.s tools/system
 +	@(echo -n "SYSSIZE = (";ls -l tools/system | grep system \
 +		| cut -c25-31 | tr '\012' ' '; echo "+ 15 ) / 16") > tmp.s
 +	@cat boot/bootsect.s >> tmp.s
  
--boot/bootsect:	boot/bootsect.s
--	$(AS86) -o boot/bootsect.o boot/bootsect.s
--	$(LD86) -s -o boot/bootsect boot/bootsect.o
--
  clean:
 -	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
 -		boot/bootsect.s boot/setup.s
@@ -167,13 +167,13 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	@script -q -c "make all"
 +	@cat typescript | col -bp | grep -E "warning|Error" > info
 +	@cat info
- 
++
 +distclean: clean
 +	@rm -f tag cscope* linux-0.11.* $(CALLTREE)
 +	@(find tools/calltree-2.3 -name "*.o" | xargs -i rm -f {})
 +	@make clean -C tools/calltree-2.3
 +	@make clean -C tools/bochs/bochs-2.3.7
-+
+ 
  backup: clean
 -	(cd .. ; tar cf - linux | compress - > backup.Z)
 -	sync
@@ -191,7 +191,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	@(for i in init/*.c;do echo -n "init/";$(CPP) -M $$i;done) >> tmp_make
 +	@cp tmp_make Makefile
 +	@for i in fs kernel mm; do make dep -C $$i; done
- 
++
 +tag: tags
 +tags:
 +	@ctags -R
@@ -269,7 +269,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	@echo "     boot/setup.s with AT&T rewritting, porting to gcc 4.3.2 :-)"
 +	@echo ""
 +	@echo "<<<Be Happy To Play With It :-)>>>"
-+
+ 
  ### Dependencies:
 -init/main.o : init/main.c include/unistd.h include/sys/stat.h \
 -  include/sys/types.h include/sys/time.h include/time.h include/sys/times.h \
@@ -285,9 +285,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +  include/linux/sched.h include/linux/head.h include/linux/fs.h \
 +  include/linux/mm.h include/signal.h include/asm/system.h \
 +  include/asm/io.h include/stddef.h include/stdarg.h include/fcntl.h
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/Makefile.header patch-new/linux-0.12/Makefile.header
---- patch-old/linux-0.12/Makefile.header	1970-01-01 08:00:00
-+++ patch-new/linux-0.12/Makefile.header	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/Makefile.header patch-new/linux-0.12/Makefile.header
+--- patch-old/linux-0.12/Makefile.header	1970-01-01 00:00:00.000000000 +0000
++++ patch-new/linux-0.12/Makefile.header	2026-04-04 05:10:32.041284735 +0000
 @@ -0,0 +1,28 @@
 +UNAME := $(shell uname)
 +
@@ -317,9 +317,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	OBJCOPY = i386-elf-objcopy
 +endif
 +
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/Makefile patch-new/linux-0.12/boot/Makefile
---- patch-old/linux-0.12/boot/Makefile	1970-01-01 08:00:00
-+++ patch-new/linux-0.12/boot/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/boot/Makefile patch-new/linux-0.12/boot/Makefile
+--- patch-old/linux-0.12/boot/Makefile	1970-01-01 00:00:00.000000000 +0000
++++ patch-new/linux-0.12/boot/Makefile	2026-04-04 05:10:32.041361319 +0000
 @@ -0,0 +1,28 @@
 +include ../Makefile.header
 +
@@ -349,10 +349,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +
 +clean:
 +	@rm -f bootsect bootsect.o setup setup.o head.o
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/bootsect.S patch-new/linux-0.12/boot/bootsect.S
---- patch-old/linux-0.12/boot/bootsect.S	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/boot/bootsect.S	2026-04-04 13:12:07
-@@ -1,383 +1,253 @@
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/boot/bootsect.S patch-new/linux-0.12/boot/bootsect.S
+--- patch-old/linux-0.12/boot/bootsect.S	1992-01-14 15:45:22.000000000 +0000
++++ patch-new/linux-0.12/boot/bootsect.S	1970-01-01 00:00:00.000000000 +0000
+@@ -1,404 +0,0 @@
 -!
 -! SYS_SIZE is the number of clicks (16 bytes) to be loaded.
 -! 0x3000 is 0x30000 bytes = 196kB, more than enough for current
@@ -378,32 +378,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -! The loader has been made as simple as possible, and continuos
 -! read errors will result in a unbreakable loop. Reboot by hand. It
 -! loads pretty fast by getting whole sectors at a time whenever possible.
-+	.code16
-+# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
-+#
-+# SYS_SIZE is the number of clicks (16 bytes) to be loaded.
-+# 0x3000 is 0x30000 bytes = 196kB, more than enough for current
-+# versions of linux
-+#
-+	.equ SYSSIZE, 0x3000
-+#
-+#	bootsect.s		(C) 1991 Linus Torvalds
-+#
-+# bootsect.s is loaded at 0x7c00 by the bios-startup routines, and moves
-+# iself out of the way to address 0x90000, and jumps there.
-+#
-+# It then loads 'setup' directly after itself (0x90200), and the system
-+# at 0x10000, using BIOS interrupts. 
-+#
-+# NOTE! currently system is at most 8*65536 bytes long. This should be no
-+# problem, even in the future. I want to keep it simple. This 512 kB
-+# kernel size should be enough, especially as this doesn't contain the
-+# buffer cache as in minix
-+#
-+# The loader has been made as simple as possible, and continuos
-+# read errors will result in a unbreakable loop. Reboot by hand. It
-+# loads pretty fast by getting whole sectors at a time whenever possible.
- 
+-
 -.globl begtext, begdata, begbss, endtext, enddata, endbss
 -.text
 -begtext:
@@ -412,57 +387,18 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -.bss
 -begbss:
 -.text
-+	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
-+	.text
-+	begtext:
-+	.data
-+	begdata:
-+	.bss
-+	begbss:
-+	.text
- 
+-
 -SETUPLEN = 4				! nr of setup-sectors
 -BOOTSEG  = 0x07c0			! original address of boot-sector
 -INITSEG  = DEF_INITSEG			! we move boot here - out of the way
 -SETUPSEG = DEF_SETUPSEG			! setup starts here
 -SYSSEG   = DEF_SYSSEG			! system loaded at 0x10000 (65536).
 -ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
-+	.equ SETUPLEN, 4		# nr of setup-sectors(256*4=1024)
-+	.equ BOOTSEG, 0x07c0	# original address of boot-sector
-+	.equ INITSEG, 0x9000	# we move boot here - out of the way
-+	.equ SETUPSEG, 0x9020	# setup starts here
-+	.equ SYSSEG, 0x1000		# system loaded at 0x10000 (65536).
-+	.equ ENDSEG, SYSSEG + SYSSIZE	# where to stop loading
- 
+-
 -! ROOT_DEV & SWAP_DEV are now written by "build".
 -ROOT_DEV = 0
 -SWAP_DEV = 0
-+# ROOT_DEV:	0x000 - same type of floppy as boot.
-+#		0x301 - first partition on first drive etc
-+#
-+##和源码不同，源码中是0x306 第2块硬盘的第一个分区
-+#
-+	.equ ROOT_DEV, 0x301
-+    .equ SWAP_DEV, 0x301
-+	ljmp $BOOTSEG, $_start #0x07c0:0005
-+_start:
-+	mov	$BOOTSEG, %ax	#将ds段寄存器设置为0x07C0
-+	mov	%ax, %ds
-+	mov	$INITSEG, %ax	#将es段寄存器设置为0x9000
-+	mov	%ax, %es
-+	mov	$256, %cx		#设置移动计数值256字
-+	sub	%si, %si		#源地址	ds:si = 0x07C0:0x0000
-+	sub	%di, %di		#目标地址 es:si = 0x9000:0x0000
-+	rep					#重复执行并递减cx的值
-+	movsw				#从内存[si]处移动cx个字到[di]处
-+	ljmp $INITSEG, $go	#段间跳转，这里INITSEG指出跳转到的段地址，解释了cs的值为0x9000
-+go:	mov	%cs, %ax		#将ds，es，ss都设置成移动后代码所在的段处(0x9000)
-+	mov	%ax, %ds
-+	mov	%ax, %es
-+# put stack at 0x9ff00.
-+	mov	%ax, %ss
-+	mov	$0xFF00, %sp	# arbitrary value >>512
- 
+-
 -entry start
 -start:
 -	mov	ax,#BOOTSEG
@@ -475,9 +411,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	rep
 -	movw
 -	jmpi	go,INITSEG
-+# load the setup-sectors directly after the bootblock.
-+# Note that 'es'(0x9000) is already set up. 
- 
+-
 -go:	mov	ax,cs		
 -	mov	dx,#0xfef4	! arbitrary value >>512 - disk parm size
 -
@@ -538,31 +472,14 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -! load the setup-sectors directly after the bootblock.
 -! Note that 'es' is already set up.
 -
-+#
-+##ah=0x02 读磁盘扇区到内存	al＝需要独出的扇区数量
-+##ch=磁道(柱面)号的低八位   cl＝开始扇区(位0-5),磁道号高2位(位6－7)
-+##dh=磁头号					dl=驱动器号(硬盘则7要置位)
-+##es:bx ->指向数据缓冲区；如果出错则CF标志置位,ah中是出错码
-+#
- load_setup:
+-load_setup:
 -	xor	dx, dx			! drive 0, head 0
 -	mov	cx,#0x0002		! sector 2, track 0
 -	mov	bx,#0x0200		! address = 512, in INITSEG
 -	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
 -	int	0x13			! read it
 -	jnc	ok_load_setup		! ok - continue
-+	mov	$0x0000, %dx	# drive 0, head 0
-+	mov	$0x0002, %cx	# sector 2, track 0
-+	mov	$0x0200, %bx	# address = 512, in INITSEG
-+	.equ AX, 0x0200+SETUPLEN
-+	mov $AX, %ax    	# service 2, nr of sectors
-+	int	$0x13			# read it
-+	jnc	ok_load_setup	# ok - continue
-+	mov	$0x0000, %dx
-+	mov	$0x0000, %ax	# reset the diskette
-+	int	$0x13
-+	jmp	load_setup
- 
+-
 -	push	ax			! dump error code
 -	call	print_nl
 -	mov	bp, sp
@@ -574,11 +491,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	int	0x13
 -	j	load_setup
 -
- ok_load_setup:
- 
+-ok_load_setup:
+-
 -! Get disk drive parameters, specifically nr of sectors/track
-+# Get disk drive parameters, specifically nr of sectors/track
- 
+-
 -	xor	dl,dl
 -	mov	ah,#0x08		! AH=8 is get drive parameters
 -	int	0x13
@@ -587,21 +503,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	mov	sectors,cx
 -	mov	ax,#INITSEG
 -	mov	es,ax
-+	mov	$0x00, %dl          # floppy
-+	mov	$0x0800, %ax		# AH=8 is get drive parameters
-+	int	$0x13
-+	#mov $0x00, %ch
-+    and $0x003f, %cx
-+	mov	%cx, %cs:sectors+0	# %cs means sectors is in %cs
-+	mov	$INITSEG, %ax       # 0x9000 
-+	mov	%ax, %es
- 
+-
 -! Print some inane message
-+# Change: 2020-02-06
-+# Clear screen
-+    mov $0x0003, %ax
-+    int $0x10
- 
+-
 -	mov	ah,#0x03		! read cursor pos
 -	xor	bh,bh
 -	int	0x10
@@ -611,36 +515,21 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	mov	bp,#msg1
 -	mov	ax,#0x1301		! write string, move cursor
 -	int	0x10
-+# Print some inane message
- 
+-
 -! ok, we've written the message, now
 -! we want to load the system (at 0x10000)
-+	mov	$0x03, %ah	    	# read cursor pos
-+	xor	%bh, %bh
-+	int	$0x10               # dh(row 0-24) dl(col 0-79)
-+	mov	$32, %cx            # nr of characters
-+	mov	$0x000b, %bx		# page 0, attribute b 
-+	mov $msg1, %bp
-+	mov	$0x1301, %ax		# write string, move cursor
-+	int	$0x10
- 
+-
 -	mov	ax,#SYSSEG
 -	mov	es,ax		! segment of 0x010000
 -	call	read_it
 -	call	kill_motor
 -	call	print_nl
-+# ok, we've written the message, now
-+# we want to load the system (at 0x10000)
- 
+-
 -! After that we check which root-device to use. If the device is
 -! defined (!= 0), nothing is done and the given device is used.
 -! Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
 -! on the number of sectors that the BIOS reports currently.
-+	mov	$SYSSEG, %ax
-+	mov	%ax, %es		# segment of 0x010000
-+	call read_it
-+	call kill_motor
- 
+-
 -	seg cs
 -	mov	ax,root_dev
 -	or	ax,ax
@@ -649,40 +538,22 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	mov	bx,sectors
 -	mov	ax,#0x0208		! /dev/ps0 - 1.2Mb
 -	cmp	bx,#15
-+# After that we check which root-device to use. If the device is
-+# defined (#= 0), nothing is done and the given device is used.
-+# Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
-+# on the number of sectors that the BIOS reports currently.
-+
-+	mov	%cs:root_dev+0, %ax #0x301
-+	cmp	$0, %ax
-+	jne	root_defined        # ROOT_DEV has defined
-+	mov	%cs:sectors+0, %bx
-+	mov	$0x0208, %ax		# /dev/ps0 - 1.2Mb
-+	cmp	$15, %bx
- 	je	root_defined
+-	je	root_defined
 -	mov	ax,#0x021c		! /dev/PS0 - 1.44Mb
 -	cmp	bx,#18
-+	mov	$0x021c, %ax		# /dev/PS0 - 1.44Mb
-+	cmp	$18, %bx
- 	je	root_defined
- undef_root:
- 	jmp undef_root
- root_defined:
+-	je	root_defined
+-undef_root:
+-	jmp undef_root
+-root_defined:
 -	seg cs
 -	mov	root_dev,ax
-+	mov	%ax, %cs:root_dev+0
- 
+-
 -! after that (everyting loaded), we jump to
 -! the setup-routine loaded directly after
 -! the bootblock:
-+# after that (everyting loaded), we jump to
-+# the setup-routine loaded directly after
-+# the bootblock:
- 
+-
 -	jmpi	0,SETUPSEG
-+	ljmp	$SETUPSEG, $0
- 
+-
 -! This routine loads the system at address 0x10000, making sure
 -! no 64kB boundaries are crossed. We try to load it as fast as
 -! possible, loading whole tracks whenever we can.
@@ -692,78 +563,44 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -sread:	.word 1+SETUPLEN	! sectors read of current track
 -head:	.word 0			! current head
 -track:	.word 0			! current track
-+# This routine loads the system at address 0x10000, making sure
-+# no 64kB boundaries are crossed. We try to load it as fast as
-+# possible, loading whole tracks whenever we can.
-+#
-+# in:	es - starting address segment (normally 0x1000)
-+#
-+sread:	.word 1+ SETUPLEN	# sectors read of current track
-+head:	.word 0			    # current head
-+track:	.word 0		    	# current track
- 
- read_it:
+-
+-read_it:
 -	mov ax,es
 -	test ax,#0x0fff
 -die:	jne die			! es must be at 64kB boundary
 -	xor bx,bx		! bx is starting address within segment
-+	mov	%es, %ax
-+	test $0x0fff, %ax
-+die:
-+    jne die			        # es must be at 64kB boundary
-+	xor %bx, %bx		    # bx is starting address within segment
- rp_read:
+-rp_read:
 -	mov ax,es
 -	cmp ax,#ENDSEG		! have we loaded all yet?
 -	jb ok1_read
-+	mov %es, %ax
-+ 	cmp $ENDSEG, %ax	    # have we loaded all yet?
-+	jb	ok1_read
- 	ret
- ok1_read:
+-	ret
+-ok1_read:
 -	seg cs
 -	mov ax,sectors
 -	sub ax,sread
 -	mov cx,ax
 -	shl cx,#9
 -	add cx,bx
-+	mov	%cs:sectors+0, %ax
-+	sub	sread, %ax
-+	mov	%ax, %cx
-+	shl	$9, %cx
-+	add	%bx, %cx
- 	jnc ok2_read
+-	jnc ok2_read
 -	je ok2_read
 -	xor ax,ax
 -	sub ax,bx
 -	shr ax,#9
-+	je 	ok2_read
-+	xor %ax, %ax
-+	sub %bx, %ax
-+	shr $9, %ax
- ok2_read:
- 	call read_track
+-ok2_read:
+-	call read_track
 -	mov cx,ax
 -	add ax,sread
 -	seg cs
 -	cmp ax,sectors
-+	mov %ax, %cx
-+	add sread, %ax
-+	cmp %cs:sectors+0, %ax
- 	jne ok3_read
+-	jne ok3_read
 -	mov ax,#1
 -	sub ax,head
-+	mov $1, %ax
-+	sub head, %ax
- 	jne ok4_read
+-	jne ok4_read
 -	inc track
-+	incw track 
- ok4_read:
+-ok4_read:
 -	mov head,ax
 -	xor ax,ax
-+	mov	%ax, head
-+	xor	%ax, %ax
- ok3_read:
+-ok3_read:
 -	mov sread,ax
 -	shl cx,#9
 -	add bx,cx
@@ -773,17 +610,8 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	mov es,ax
 -	xor bx,bx
 -	jmp rp_read
-+	mov	%ax, sread
-+	shl	$9, %cx
-+	add	%cx, %bx
-+	jnc	rp_read
-+	mov	%es, %ax
-+	add	$0x1000, %ax
-+	mov	%ax, %es
-+	xor	%bx, %bx
-+	jmp	rp_read
- 
- read_track:
+-
+-read_track:
 -	pusha
 -	pusha	
 -	mov	ax, #0xe2e 	! loading... message 2e = .
@@ -809,35 +637,8 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	jc bad_rt
 -	add	sp, #8   	
 -	popa
-+	push %ax
-+	push %bx
-+	push %cx
-+	push %dx
-+	mov	track, %dx
-+	mov	sread, %cx
-+	inc	%cx
-+	mov	%dl, %ch
-+	mov	head, %dx
-+	mov	%dl, %dh
-+	mov	$0, %dl
-+	and	$0x0100, %dx
-+	mov	$2, %ah
-+	int	$0x13
-+	jc	bad_rt
-+	pop	%dx
-+	pop	%cx
-+	pop	%bx
-+	pop	%ax
- 	ret
-+bad_rt:	mov	$0, %ax
-+	mov	$0, %dx
-+	int	$0x13
-+	pop	%dx
-+	pop	%cx
-+	pop	%bx
-+	pop	%ax
-+	jmp	read_track
- 
+-	ret
+-
 -bad_rt:	push	ax				! save error code
 -	call	print_all			! ah = error, al = read
 -	
@@ -926,42 +727,28 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 - * that we enter the kernel in a known state, and
 - * don't have to worry about it later.
 - */
-+#/*
-+# * This procedure turns off the floppy drive motor, so
-+# * that we enter the kernel in a known state, and
-+# * don't have to worry about it later.
-+# */
- kill_motor:
+-kill_motor:
 -	push dx
 -	mov dx,#0x3f2
 -	xor al, al
 -	outb
 -	pop dx
-+	push %dx
-+	mov	$0x3f2, %dx
-+	mov	$0, %al
-+	outsb
-+	pop	%dx
- 	ret
- 
- sectors:
-@@ -385,20 +255,20 @@
- 
- msg1:
- 	.byte 13,10
+-	ret
+-
+-sectors:
+-	.word 0
+-
+-msg1:
+-	.byte 13,10
 -	.ascii "Loading"
-+	.ascii "linux 0.12 OS is booting ..."
-+	.byte 13,10
- 
+-
 -.org 506
-+	.org 506
- swap_dev:
+-swap_dev:
 -	.word SWAP_DEV
-+    .word SWAP_DEV
- root_dev:
- 	.word ROOT_DEV
- boot_flag:
- 	.word 0xAA55
+-root_dev:
+-	.word ROOT_DEV
+-boot_flag:
+-	.word 0xAA55
 -
 -.text
 -endtext:
@@ -970,42 +757,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -.bss
 -endbss:
 -
-+	
-+	.text
-+	endtext:
-+	.data
-+	enddata:
-+	.bss
-+	endbss:
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/bootsect.s patch-new/linux-0.12/boot/bootsect.s
---- patch-old/linux-0.12/boot/bootsect.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/boot/bootsect.s	2026-04-04 13:12:07
-@@ -1,383 +1,253 @@
--!
--! SYS_SIZE is the number of clicks (16 bytes) to be loaded.
--! 0x3000 is 0x30000 bytes = 196kB, more than enough for current
--! versions of linux
--!
--#include <linux/config.h>
--SYSSIZE = DEF_SYSSIZE
--!
--!	bootsect.s		(C) 1991 Linus Torvalds
--!	modified by Drew Eckhardt
--!
--! bootsect.s is loaded at 0x7c00 by the bios-startup routines, and moves
--! iself out of the way to address 0x90000, and jumps there.
--!
--! It then loads 'setup' directly after itself (0x90200), and the system
--! at 0x10000, using BIOS interrupts. 
--!
--! NOTE! currently system is at most 8*65536 bytes long. This should be no
--! problem, even in the future. I want to keep it simple. This 512 kB
--! kernel size should be enough, especially as this doesn't contain the
--! buffer cache as in minix
--!
--! The loader has been made as simple as possible, and continuos
--! read errors will result in a unbreakable loop. Reboot by hand. It
--! loads pretty fast by getting whole sectors at a time whenever possible.
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/boot/bootsect.s patch-new/linux-0.12/boot/bootsect.s
+--- patch-old/linux-0.12/boot/bootsect.s	1970-01-01 00:00:00.000000000 +0000
++++ patch-new/linux-0.12/boot/bootsect.s	2026-04-04 05:10:32.041486820 +0000
+@@ -0,0 +1,274 @@
 +	.code16
 +# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
 +#
@@ -1031,15 +786,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +# The loader has been made as simple as possible, and continuos
 +# read errors will result in a unbreakable loop. Reboot by hand. It
 +# loads pretty fast by getting whole sectors at a time whenever possible.
- 
--.globl begtext, begdata, begbss, endtext, enddata, endbss
--.text
--begtext:
--.data
--begdata:
--.bss
--begbss:
--.text
++
 +	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
 +	.text
 +	begtext:
@@ -1048,23 +795,14 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	.bss
 +	begbss:
 +	.text
- 
--SETUPLEN = 4				! nr of setup-sectors
--BOOTSEG  = 0x07c0			! original address of boot-sector
--INITSEG  = DEF_INITSEG			! we move boot here - out of the way
--SETUPSEG = DEF_SETUPSEG			! setup starts here
--SYSSEG   = DEF_SYSSEG			! system loaded at 0x10000 (65536).
--ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
++
 +	.equ SETUPLEN, 4		# nr of setup-sectors(256*4=1024)
 +	.equ BOOTSEG, 0x07c0	# original address of boot-sector
 +	.equ INITSEG, 0x9000	# we move boot here - out of the way
 +	.equ SETUPSEG, 0x9020	# setup starts here
 +	.equ SYSSEG, 0x1000		# system loaded at 0x10000 (65536).
 +	.equ ENDSEG, SYSSEG + SYSSIZE	# where to stop loading
- 
--! ROOT_DEV & SWAP_DEV are now written by "build".
--ROOT_DEV = 0
--SWAP_DEV = 0
++
 +# ROOT_DEV:	0x000 - same type of floppy as boot.
 +#		0x301 - first partition on first drive etc
 +#
@@ -1090,95 +828,17 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +# put stack at 0x9ff00.
 +	mov	%ax, %ss
 +	mov	$0xFF00, %sp	# arbitrary value >>512
- 
--entry start
--start:
--	mov	ax,#BOOTSEG
--	mov	ds,ax
--	mov	ax,#INITSEG
--	mov	es,ax
--	mov	cx,#256
--	sub	si,si
--	sub	di,di
--	rep
--	movw
--	jmpi	go,INITSEG
++
 +# load the setup-sectors directly after the bootblock.
 +# Note that 'es'(0x9000) is already set up. 
- 
--go:	mov	ax,cs		
--	mov	dx,#0xfef4	! arbitrary value >>512 - disk parm size
--
--	mov	ds,ax
--	mov	es,ax
--	push	ax
--
--	mov	ss,ax		! put stack at 0x9ff00 - 12.
--	mov	sp,dx
--/*
-- *	Many BIOS's default disk parameter tables will not 
-- *	recognize multi-sector reads beyond the maximum sector number
-- *	specified in the default diskette parameter tables - this may
-- *	mean 7 sectors in some cases.
-- *
-- *	Since single sector reads are slow and out of the question,
-- *	we must take care of this by creating new parameter tables
-- *	(for the first disk) in RAM.  We will set the maximum sector
-- *	count to 18 - the most we will encounter on an HD 1.44.  
-- *
-- *	High doesn't hurt.  Low does.
-- *
-- *	Segments are as follows: ds=es=ss=cs - INITSEG,
-- *		fs = 0, gs = parameter table segment
-- */
--
--
--	push	#0
--	pop	fs
--	mov	bx,#0x78		! fs:bx is parameter table address
--	seg fs
--	lgs	si,(bx)			! gs:si is source
--
--	mov	di,dx			! es:di is destination
--	mov	cx,#6			! copy 12 bytes
--	cld
--
--	rep
--	seg gs
--	movw
--
--	mov	di,dx
--	movb	4(di),*18		! patch sector count
--
--	seg fs
--	mov	(bx),di
--	seg fs
--	mov	2(bx),es
--
--	pop	ax
--	mov	fs,ax
--	mov	gs,ax
--	
--	xor	ah,ah			! reset FDC 
--	xor	dl,dl
--	int 	0x13	
--
--! load the setup-sectors directly after the bootblock.
--! Note that 'es' is already set up.
--
++
 +#
 +##ah=0x02 读磁盘扇区到内存	al＝需要独出的扇区数量
 +##ch=磁道(柱面)号的低八位   cl＝开始扇区(位0-5),磁道号高2位(位6－7)
 +##dh=磁头号					dl=驱动器号(硬盘则7要置位)
 +##es:bx ->指向数据缓冲区；如果出错则CF标志置位,ah中是出错码
 +#
- load_setup:
--	xor	dx, dx			! drive 0, head 0
--	mov	cx,#0x0002		! sector 2, track 0
--	mov	bx,#0x0200		! address = 512, in INITSEG
--	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
--	int	0x13			! read it
--	jnc	ok_load_setup		! ok - continue
++load_setup:
 +	mov	$0x0000, %dx	# drive 0, head 0
 +	mov	$0x0002, %cx	# sector 2, track 0
 +	mov	$0x0200, %bx	# address = 512, in INITSEG
@@ -1190,31 +850,11 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	$0x0000, %ax	# reset the diskette
 +	int	$0x13
 +	jmp	load_setup
- 
--	push	ax			! dump error code
--	call	print_nl
--	mov	bp, sp
--	call	print_hex
--	pop	ax	
--	
--	xor	dl, dl			! reset FDC
--	xor	ah, ah
--	int	0x13
--	j	load_setup
--
- ok_load_setup:
- 
--! Get disk drive parameters, specifically nr of sectors/track
++
++ok_load_setup:
++
 +# Get disk drive parameters, specifically nr of sectors/track
- 
--	xor	dl,dl
--	mov	ah,#0x08		! AH=8 is get drive parameters
--	int	0x13
--	xor	ch,ch
--	seg cs
--	mov	sectors,cx
--	mov	ax,#INITSEG
--	mov	es,ax
++
 +	mov	$0x00, %dl          # floppy
 +	mov	$0x0800, %ax		# AH=8 is get drive parameters
 +	int	$0x13
@@ -1223,26 +863,14 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	%cx, %cs:sectors+0	# %cs means sectors is in %cs
 +	mov	$INITSEG, %ax       # 0x9000 
 +	mov	%ax, %es
- 
--! Print some inane message
++
 +# Change: 2020-02-06
 +# Clear screen
 +    mov $0x0003, %ax
 +    int $0x10
- 
--	mov	ah,#0x03		! read cursor pos
--	xor	bh,bh
--	int	0x10
--	
--	mov	cx,#9
--	mov	bx,#0x0007		! page 0, attribute 7 (normal)
--	mov	bp,#msg1
--	mov	ax,#0x1301		! write string, move cursor
--	int	0x10
++
 +# Print some inane message
- 
--! ok, we've written the message, now
--! we want to load the system (at 0x10000)
++
 +	mov	$0x03, %ah	    	# read cursor pos
 +	xor	%bh, %bh
 +	int	$0x10               # dh(row 0-24) dl(col 0-79)
@@ -1251,32 +879,15 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov $msg1, %bp
 +	mov	$0x1301, %ax		# write string, move cursor
 +	int	$0x10
- 
--	mov	ax,#SYSSEG
--	mov	es,ax		! segment of 0x010000
--	call	read_it
--	call	kill_motor
--	call	print_nl
++
 +# ok, we've written the message, now
 +# we want to load the system (at 0x10000)
- 
--! After that we check which root-device to use. If the device is
--! defined (!= 0), nothing is done and the given device is used.
--! Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
--! on the number of sectors that the BIOS reports currently.
++
 +	mov	$SYSSEG, %ax
 +	mov	%ax, %es		# segment of 0x010000
 +	call read_it
 +	call kill_motor
- 
--	seg cs
--	mov	ax,root_dev
--	or	ax,ax
--	jne	root_defined
--	seg cs
--	mov	bx,sectors
--	mov	ax,#0x0208		! /dev/ps0 - 1.2Mb
--	cmp	bx,#15
++
 +# After that we check which root-device to use. If the device is
 +# defined (#= 0), nothing is done and the given device is used.
 +# Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
@@ -1288,38 +899,21 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	%cs:sectors+0, %bx
 +	mov	$0x0208, %ax		# /dev/ps0 - 1.2Mb
 +	cmp	$15, %bx
- 	je	root_defined
--	mov	ax,#0x021c		! /dev/PS0 - 1.44Mb
--	cmp	bx,#18
++	je	root_defined
 +	mov	$0x021c, %ax		# /dev/PS0 - 1.44Mb
 +	cmp	$18, %bx
- 	je	root_defined
- undef_root:
- 	jmp undef_root
- root_defined:
--	seg cs
--	mov	root_dev,ax
++	je	root_defined
++undef_root:
++	jmp undef_root
++root_defined:
 +	mov	%ax, %cs:root_dev+0
- 
--! after that (everyting loaded), we jump to
--! the setup-routine loaded directly after
--! the bootblock:
++
 +# after that (everyting loaded), we jump to
 +# the setup-routine loaded directly after
 +# the bootblock:
- 
--	jmpi	0,SETUPSEG
++
 +	ljmp	$SETUPSEG, $0
- 
--! This routine loads the system at address 0x10000, making sure
--! no 64kB boundaries are crossed. We try to load it as fast as
--! possible, loading whole tracks whenever we can.
--!
--! in:	es - starting address segment (normally 0x1000)
--!
--sread:	.word 1+SETUPLEN	! sectors read of current track
--head:	.word 0			! current head
--track:	.word 0			! current track
++
 +# This routine loads the system at address 0x10000, making sure
 +# no 64kB boundaries are crossed. We try to load it as fast as
 +# possible, loading whole tracks whenever we can.
@@ -1329,78 +923,43 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +sread:	.word 1+ SETUPLEN	# sectors read of current track
 +head:	.word 0			    # current head
 +track:	.word 0		    	# current track
- 
- read_it:
--	mov ax,es
--	test ax,#0x0fff
--die:	jne die			! es must be at 64kB boundary
--	xor bx,bx		! bx is starting address within segment
++
++read_it:
 +	mov	%es, %ax
 +	test $0x0fff, %ax
 +die:
 +    jne die			        # es must be at 64kB boundary
 +	xor %bx, %bx		    # bx is starting address within segment
- rp_read:
--	mov ax,es
--	cmp ax,#ENDSEG		! have we loaded all yet?
--	jb ok1_read
++rp_read:
 +	mov %es, %ax
 + 	cmp $ENDSEG, %ax	    # have we loaded all yet?
 +	jb	ok1_read
- 	ret
- ok1_read:
--	seg cs
--	mov ax,sectors
--	sub ax,sread
--	mov cx,ax
--	shl cx,#9
--	add cx,bx
++	ret
++ok1_read:
 +	mov	%cs:sectors+0, %ax
 +	sub	sread, %ax
 +	mov	%ax, %cx
 +	shl	$9, %cx
 +	add	%bx, %cx
- 	jnc ok2_read
--	je ok2_read
--	xor ax,ax
--	sub ax,bx
--	shr ax,#9
++	jnc ok2_read
 +	je 	ok2_read
 +	xor %ax, %ax
 +	sub %bx, %ax
 +	shr $9, %ax
- ok2_read:
- 	call read_track
--	mov cx,ax
--	add ax,sread
--	seg cs
--	cmp ax,sectors
++ok2_read:
++	call read_track
 +	mov %ax, %cx
 +	add sread, %ax
 +	cmp %cs:sectors+0, %ax
- 	jne ok3_read
--	mov ax,#1
--	sub ax,head
++	jne ok3_read
 +	mov $1, %ax
 +	sub head, %ax
- 	jne ok4_read
--	inc track
++	jne ok4_read
 +	incw track 
- ok4_read:
--	mov head,ax
--	xor ax,ax
++ok4_read:
 +	mov	%ax, head
 +	xor	%ax, %ax
- ok3_read:
--	mov sread,ax
--	shl cx,#9
--	add bx,cx
--	jnc rp_read
--	mov ax,es
--	add ah,#0x10
--	mov es,ax
--	xor bx,bx
--	jmp rp_read
++ok3_read:
 +	mov	%ax, sread
 +	shl	$9, %cx
 +	add	%cx, %bx
@@ -1410,33 +969,8 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	%ax, %es
 +	xor	%bx, %bx
 +	jmp	rp_read
- 
- read_track:
--	pusha
--	pusha	
--	mov	ax, #0xe2e 	! loading... message 2e = .
--	mov	bx, #7
-- 	int	0x10
--	popa		
--
--	mov dx,track
--	mov cx,sread
--	inc cx
--	mov ch,dl
--	mov dx,head
--	mov dh,dl
--	and dx,#0x0100
--	mov ah,#2
--	
--	push	dx				! save for error dump
--	push	cx
--	push	bx
--	push	ax
--
--	int 0x13
--	jc bad_rt
--	add	sp, #8   	
--	popa
++
++read_track:
 +	push %ax
 +	push %bx
 +	push %cx
@@ -1456,7 +990,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	pop	%cx
 +	pop	%bx
 +	pop	%ax
- 	ret
++	ret
 +bad_rt:	mov	$0, %ax
 +	mov	$0, %dx
 +	int	$0x13
@@ -1465,139 +999,35 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	pop	%bx
 +	pop	%ax
 +	jmp	read_track
- 
--bad_rt:	push	ax				! save error code
--	call	print_all			! ah = error, al = read
--	
--	
--	xor ah,ah
--	xor dl,dl
--	int 0x13
--	
--
--	add	sp, #10
--	popa	
--	jmp read_track
--
--/*
-- *	print_all is for debugging purposes.  
-- *	It will print out all of the registers.  The assumption is that this is
-- *	called from a routine, with a stack frame like
-- *	dx 
-- *	cx
-- *	bx
-- *	ax
-- *	error
-- *	ret <- sp
-- *
--*/
-- 
--print_all:
--	mov	cx, #5		! error code + 4 registers
--	mov	bp, sp	
--
--print_loop:
--	push	cx		! save count left
--	call	print_nl	! nl for readability
--	jae	no_reg		! see if register name is needed
--	
--	mov	ax, #0xe05 + 0x41 - 1
--	sub	al, cl
--	int	0x10
--
--	mov	al, #0x58 	! X
--	int	0x10
--
--	mov	al, #0x3a 	! :
--	int	0x10
--
--no_reg:
--	add	bp, #2		! next register
--	call	print_hex	! print it
--	pop	cx
--	loop	print_loop
--	ret
--
--print_nl:
--	mov	ax, #0xe0d	! CR
--	int	0x10
--	mov	al, #0xa	! LF
--	int 	0x10
--	ret
--
--/*
-- *	print_hex is for debugging purposes, and prints the word
-- *	pointed to by ss:bp in hexadecmial.
--*/
--
--print_hex:
--	mov	cx, #4		! 4 hex digits
--	mov	dx, (bp)	! load word into dx
--print_digit:
--	rol	dx, #4		! rotate so that lowest 4 bits are used
--	mov	ah, #0xe	
--	mov	al, dl		! mask off so we have only next nibble
--	and	al, #0xf
--	add	al, #0x30	! convert to 0 based digit, '0'
--	cmp	al, #0x39	! check for overflow
--	jbe	good_digit
--	add	al, #0x41 - 0x30 - 0xa 	! 'A' - '0' - 0xa
--
--good_digit:
--	int	0x10
--	loop	print_digit
--	ret
--
--
--/*
-- * This procedure turns off the floppy drive motor, so
-- * that we enter the kernel in a known state, and
-- * don't have to worry about it later.
-- */
++
 +#/*
 +# * This procedure turns off the floppy drive motor, so
 +# * that we enter the kernel in a known state, and
 +# * don't have to worry about it later.
 +# */
- kill_motor:
--	push dx
--	mov dx,#0x3f2
--	xor al, al
--	outb
--	pop dx
++kill_motor:
 +	push %dx
 +	mov	$0x3f2, %dx
 +	mov	$0, %al
 +	outsb
 +	pop	%dx
- 	ret
- 
- sectors:
-@@ -385,20 +255,20 @@
- 
- msg1:
- 	.byte 13,10
--	.ascii "Loading"
++	ret
++
++sectors:
++	.word 0
++
++msg1:
++	.byte 13,10
 +	.ascii "linux 0.12 OS is booting ..."
 +	.byte 13,10
- 
--.org 506
++
 +	.org 506
- swap_dev:
--	.word SWAP_DEV
++swap_dev:
 +    .word SWAP_DEV
- root_dev:
- 	.word ROOT_DEV
- boot_flag:
- 	.word 0xAA55
--
--.text
--endtext:
--.data
--enddata:
--.bss
--endbss:
--
++root_dev:
++	.word ROOT_DEV
++boot_flag:
++	.word 0xAA55
 +	
 +	.text
 +	endtext:
@@ -1605,9 +1035,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	enddata:
 +	.bss
 +	endbss:
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/head.s patch-new/linux-0.12/boot/head.s
---- patch-old/linux-0.12/boot/head.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/boot/head.s	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/boot/head.s patch-new/linux-0.12/boot/head.s
+--- patch-old/linux-0.12/boot/head.s	1992-01-11 04:50:17.000000000 +0000
++++ patch-new/linux-0.12/boot/head.s	2026-04-04 05:10:32.041561862 +0000
 @@ -12,28 +12,30 @@
   * the page directory.
   */
@@ -1740,10 +1170,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	.quad 0x00c09a0000000fff	/* 16Mb */
  	.quad 0x00c0920000000fff	/* 16Mb */
  	.quad 0x0000000000000000	/* TEMPORARY - don't use */
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/setup.S patch-new/linux-0.12/boot/setup.S
---- patch-old/linux-0.12/boot/setup.S	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/boot/setup.S	2026-04-04 13:12:07
-@@ -1,628 +1,359 @@
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/boot/setup.S patch-new/linux-0.12/boot/setup.S
+--- patch-old/linux-0.12/boot/setup.S	1992-01-11 18:10:18.000000000 +0000
++++ patch-new/linux-0.12/boot/setup.S	1970-01-01 00:00:00.000000000 +0000
+@@ -1,631 +0,0 @@
 -!
 -!	setup.s		(C) 1991 Linus Torvalds
 -!
@@ -1757,33 +1187,14 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -! system to read them from there before the area is overwritten
 -! for buffer-blocks.
 -!
-+	.code16
-+# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
-+#
-+#	setup.s		(C) 1991 Linus Torvalds
-+#
-+# setup.s is responsible for getting the system data from the BIOS,
-+# and putting them into the appropriate places in system memory.
-+# both setup.s and system has been loaded by the bootblock.
-+#
-+# This code asks the bios for memory/disk/other parameters, and
-+# puts them in a "safe" place: 0x90000-0x901FF, ie where the
-+# boot-block used to be. It is then up to the protected mode
-+# system to read them from there before the area is overwritten
-+# for buffer-blocks.
-+#
- 
+-
 -! NOTE! These had better be the same as in bootsect.s!
 -#include <linux/config.h>
-+# NOTE! These had better be the same as in bootsect.s!
- 
+-
 -INITSEG  = DEF_INITSEG	! we move boot here - out of the way
 -SYSSEG   = DEF_SYSSEG	! system loaded at 0x10000 (65536).
 -SETUPSEG = DEF_SETUPSEG	! this is the current segment
-+	.equ INITSEG, 0x9000	# we move boot here - out of the way
-+	.equ SYSSEG, 0x1000	# system loaded at 0x10000 (65536).
-+	.equ SETUPSEG, 0x9020	# this is the current segment
- 
+-
 -.globl begtext, begdata, begbss, endtext, enddata, endbss
 -.text
 -begtext:
@@ -1792,82 +1203,24 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -.bss
 -begbss:
 -.text
-+	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
-+	.text
-+	begtext:
-+	.data
-+	begdata:
-+	.bss
-+	begbss:
-+	.text
- 
+-
 -entry start
 -start:
-+	ljmp $SETUPSEG, $_start	#phaddr: 0x90205
-+_start:
-+	mov %cs,%ax         #0x9020
-+	mov %ax,%ds
-+	mov %ax,%es
-+#
-+##print some message
-+#
-+	mov $0x03, %ah
-+	xor %bh, %bh
-+	int $0x10
-+	mov $27, %cx
-+	mov $0x000b,%bx
-+	mov $msg2,%bp
-+	mov $0x1301, %ax
-+	int $0x10
- 
+-
 -! ok, the read went well so we get current cursor position and save it for
 -! posterity.
-+# ok, the read went well so we get current cursor position and save it for
-+# posterity.
-+	mov	$INITSEG, %ax	# this is done in bootsect already, but...
-+	mov	%ax, %ds
-+	mov	$0x03, %ah	    # read cursor pos
-+	xor	%bh, %bh
-+	int	$0x10		    # save it in known place, con_init fetches
-+	mov	%dx, %ds:0	    # it from 0x90000.
- 
+-
 -	mov	ax,#INITSEG	! this is done in bootsect already, but...
 -	mov	ds,ax
-+# Get memory size (extended mem, kB)
-+    mov $INITSEG, %ax
-+    mov %ax, %ds 
-+	mov	$0x88, %ah 
-+	int	$0x15
-+	mov	%ax, %ds:2      # save the value of extended memory size in 0x90002,
-+                        # which excludes 1MB. (it's 15MB in this case)
- 
+-
 -! Get memory size (extended mem, kB)
-+# Get video-card data:
-+    mov $INITSEG, %ax
-+    mov %ax, %ds 
-+	mov	$0x0f, %ah
-+	int	$0x10
-+	mov	%bx, %ds:4	    # bh = display page (0x00)
-+	mov	%ax, %ds:6	    # al = video mode, ah = window width (0x50,0x03)
-+                        # 80x25(col*row)
- 
+-
 -	mov	ah,#0x88
 -	int	0x15
 -	mov	[2],ax
-+# check for EGA/VGA and some config parameters
-+    mov $INITSEG, %ax
-+    mov %ax, %ds
-+	mov	$0x12, %ah
-+	mov	$0x10, %bl
-+	int	$0x10
-+	mov	%ax, %ds:8      # ???
-+	mov	%bx, %ds:10     # bh = video mode bl = video memory size(256KB)
-+	mov	%cx, %ds:12     # EGA 80x25
- 
+-
 -! check for EGA/VGA and some config parameters
-+    mov $0x5019, %ax    # 80x25
-+    mov %ax, %ds:14
- 
+-
 -	mov	ah,#0x12
 -	mov	bl,#0x10
 -	int	0x10
@@ -1890,8 +1243,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	int	0x10
 -	mov	[4],bx		! bh = display page
 -	mov	[6],ax		! al = video mode, ah = window width
-+# Get hd0 data(fixed disk parameter table)
- 
+-
 -! Get hd0 data
 -
 -	mov	ax,#0x0000
@@ -1901,19 +1253,11 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	mov	es,ax
 -	mov	di,#0x0080
 -	mov	cx,#0x10
-+	mov	$0x0000, %ax
-+	mov	%ax, %ds
-+	lds	%ds:4*0x41, %si # src
-+	mov	$INITSEG, %ax
-+	mov	%ax, %es
-+	mov	$0x0080, %di    # dst: 0x90080
-+	mov	$0x10, %cx      # the size of FDPT is 16)
- 	rep
- 	movsb
- 
+-	rep
+-	movsb
+-
 -! Get hd1 data
-+# Get hd1 data
- 
+-
 -	mov	ax,#0x0000
 -	mov	ds,ax
 -	lds	si,[4*0x46]
@@ -1921,169 +1265,58 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	mov	es,ax
 -	mov	di,#0x0090
 -	mov	cx,#0x10
-+	mov	$0x0000, %ax
-+	mov	%ax, %ds
-+	lds	%ds:4*0x46, %si #
-+	mov	$INITSEG, %ax
-+	mov	%ax, %es
-+	mov	$0x0090, %di
-+	mov	$0x10, %cx
- 	rep
- 	movsb
- 
+-	rep
+-	movsb
+-
 -! Check that there IS a hd1 :-)
-+## modify ds
-+	mov $INITSEG,%ax
-+	mov %ax,%ds
-+	mov $SETUPSEG,%ax
-+	mov %ax,%es
- 
+-
 -	mov	ax,#0x01500
 -	mov	dl,#0x81
 -	int	0x13
-+##show cursor pos:
-+	mov $0x03, %ah 
-+	xor %bh,%bh
-+	int $0x10
-+	mov $11,%cx
-+	mov $0x000a,%bx
-+	mov $cur,%bp
-+	mov $0x1301,%ax
-+	int $0x10
-+##show detail(row*col)
-+	mov %ds:0 ,%ax
-+	call print_hex
-+	call print_nl
-+
-+##show memory size
-+	mov $0x03, %ah
-+	xor %bh, %bh
-+	int $0x10
-+	mov $12, %cx
-+	mov $0x000a, %bx
-+	mov $mem, %bp
-+	mov $0x1301, %ax
-+	int $0x10
-+##show detail(KB)
-+	mov %ds:2 , %ax
-+	call print_hex
-+
-+##show nr of cylinders
-+	mov $0x03, %ah
-+	xor %bh, %bh
-+	int $0x10
-+	mov $25, %cx
-+	mov $0x000a, %bx
-+	mov $cyl, %bp
-+	mov $0x1301, %ax
-+	int $0x10
-+##show detail
-+	mov %ds:0x80, %ax
-+	call print_hex
-+	call print_nl
-+
-+##show nr of heads
-+	mov $0x03, %ah
-+	xor %bh, %bh
-+	int $0x10
-+	mov $9, %cx
-+	mov $0x000a, %bx
-+	mov $head, %bp
-+	mov $0x1301, %ax
-+	int $0x10
-+##show detail
-+	mov %ds:0x82, %ax
-+	call print_hex
-+	call print_nl
-+
-+##show nr of sectors per track 
-+	mov $0x03, %ah
-+	xor %bh, %bh
-+	int $0x10
-+	mov $9, %cx
-+	mov $0x000a, %bx
-+	mov $sect, %bp
-+	mov $0x1301, %ax
-+	int $0x10
-+##show detail
-+	mov %ds:0x8e, %ax
-+	call print_hex
-+	call print_nl
-+
-+# Check that there IS a hd1 :-)
-+
-+	mov	$0x01500, %ax
-+	mov	$0x81, %dl
-+	int	$0x13
- 	jc	no_disk1
+-	jc	no_disk1
 -	cmp	ah,#3
-+	cmp	$3, %ah
- 	je	is_disk1
- no_disk1:
+-	je	is_disk1
+-no_disk1:
 -	mov	ax,#INITSEG
 -	mov	es,ax
 -	mov	di,#0x0090
 -	mov	cx,#0x10
 -	mov	ax,#0x00
 -	rep
-+	mov	$INITSEG, %ax
-+	mov	%ax, %es
-+	mov	$0x0090, %di
-+	mov	$0x10, %cx
-+	mov	$0x00, %ax
-+	rep             # clear       
- 	stosb
- is_disk1:
- 
+-	stosb
+-is_disk1:
+-
 -! now we want to move to protected mode ...
-+# now we want to move to protected mode ...
- 
+-
 -	cli			! no interrupts allowed !
-+	cli			    # no interrupts allowed ! 
- 
+-
 -! first we move the system to it's rightful place
-+# first we move the system to its rightful place(load kernel module)
- 
+-
 -	mov	ax,#0x0000
 -	cld			! 'direction'=0, movs moves forward
-+	mov	$0x0000, %ax
-+	cld			    # 'direction'=0, movs moves forward
- do_move:
+-do_move:
 -	mov	es,ax		! destination segment
 -	add	ax,#0x1000
 -	cmp	ax,#0x9000
-+	mov	%ax, %es	# destination segment
-+	add	$0x1000, %ax
-+	cmp	$0x9000, %ax # 0x9000 SYS_SIZE 
- 	jz	end_move
+-	jz	end_move
 -	mov	ds,ax		! source segment
 -	sub	di,di
 -	sub	si,si
 -	mov 	cx,#0x8000
-+	mov	%ax, %ds	# source segment
-+	sub	%di, %di
-+	sub	%si, %si
-+	mov $0x8000, %cx
- 	rep
- 	movsw
- 	jmp	do_move
- 
+-	rep
+-	movsw
+-	jmp	do_move
+-
 -! then we load the segment descriptors
-+# then we load the segment descriptors
- 
- end_move:
+-
+-end_move:
 -	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
 -	mov	ds,ax
 -	lidt	idt_48		! load idt with 0,0
 -	lgdt	gdt_48		! load gdt with whatever appropriate
-+	mov	$SETUPSEG, %ax	# right, forgot this at first. didn't work :-)
-+	mov	%ax, %ds        # 0x9020
-+	lidt idt_48		    # load idt with 0,0
-+	lgdt gdt_48		    # load gdt with whatever appropriate
- 
+-
 -! that was painless, now we enable A20
-+# that was painless, now we enable A20
- 
+-
 -	call	empty_8042
 -	mov	al,#0xD1		! command write
 -	out	#0x64,al
@@ -2091,10 +1324,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	mov	al,#0xDF		! A20 on
 -	out	#0x60,al
 -	call	empty_8042
-+	inb     $0x92, %al	# open A20 line(Fast Gate A20).
-+	orb     $0b00000010, %al
-+	outb    %al, $0x92
- 
+-
 -! well, that went ok, I hope. Now we have to reprogram the interrupts :-(
 -! we put them right after the intel-reserved hardware interrupts, at
 -! int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
@@ -2102,62 +1332,34 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
 -! which is used for the internal hardware interrupts as well. We just
 -! have to reprogram the 8259's, and it isn't fun.
-+# well, that went ok, I hope. Now we have to reprogram the interrupts :-(
-+# we put them right after the intel-reserved hardware interrupts, at
-+# int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
-+# messed this up with the original PC, and they haven't been able to
-+# rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
-+# which is used for the internal hardware interrupts as well. We just
-+# have to reprogram the 8259's, and it isn't fun.
- 
+-
 -	mov	al,#0x11		! initialization sequence
 -	out	#0x20,al		! send it to 8259A-1
 -	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
 -	out	#0xA0,al		! and to 8259A-2
-+	mov	$0x11, %al		# initialization sequence(ICW1)
-+					    # ICW4 needed(1),CASCADE mode,Level-triggered
-+	out	%al, $0x20		# send it to 8259A-1
-+	.word   0x00eb,0x00eb		# jmp $+2, jmp $+2
-+	out	%al, $0xA0		# and to 8259A-2
- 	.word	0x00eb,0x00eb
+-	.word	0x00eb,0x00eb
 -	mov	al,#0x20		! start of hardware int's (0x20)
 -	out	#0x21,al
-+	mov	$0x20, %al		# start of hardware int's (0x20)(ICW2)
-+	out	%al, $0x21		# from 0x20-0x27
- 	.word	0x00eb,0x00eb
+-	.word	0x00eb,0x00eb
 -	mov	al,#0x28		! start of hardware int's 2 (0x28)
 -	out	#0xA1,al
-+	mov	$0x28, %al		# start of hardware int's 2 (0x28)
-+	out	%al, $0xA1		# from 0x28-0x2F
-+	.word	0x00eb,0x00eb		# IR 7654 3210
-+	mov	$0x04, %al		# 8259-1 is master(0000 0100)
-+	out	%al, $0x21		# 
-+	.word	0x00eb,0x00eb		# INT
-+	mov	$0x02, %al		# 8259-2 is slave(010 --> 2)
-+	out	%al, $0xA1
- 	.word	0x00eb,0x00eb
+-	.word	0x00eb,0x00eb
 -	mov	al,#0x04		! 8259-1 is master
 -	out	#0x21,al
-+	mov	$0x01, %al		# 8086 mode for both
-+	out	%al, $0x21
- 	.word	0x00eb,0x00eb
+-	.word	0x00eb,0x00eb
 -	mov	al,#0x02		! 8259-2 is slave
 -	out	#0xA1,al
-+	out	%al, $0xA1
- 	.word	0x00eb,0x00eb
+-	.word	0x00eb,0x00eb
 -	mov	al,#0x01		! 8086 mode for both
 -	out	#0x21,al
-+	mov	$0xFF, %al		# mask off all interrupts for now
-+	out	%al, $0x21
- 	.word	0x00eb,0x00eb
+-	.word	0x00eb,0x00eb
 -	out	#0xA1,al
 -	.word	0x00eb,0x00eb
 -	mov	al,#0xFF		! mask off all interrupts for now
 -	out	#0x21,al
 -	.word	0x00eb,0x00eb
 -	out	#0xA1,al
-+	out	%al, $0xA1
- 
+-
 -! well, that certainly wasn't fun :-(. Hopefully it works, and we don't
 -! need no steenking BIOS anyway (except for the initial loading :-).
 -! The BIOS-routine wants lots of unnecessary data, and it's less
@@ -2167,23 +1369,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -! things as simple as possible, we do no register set-up or anything,
 -! we let the gnu-compiled 32-bit programs do that. We just jump to
 -! absolute address 0x00000, in 32-bit protected mode.
-+# well, that certainly wasn't fun :-(. Hopefully it works, and we don't
-+# need no steenking BIOS anyway (except for the initial loading :-).
-+# The BIOS-routine wants lots of unnecessary data, and it's less
-+# "interesting" anyway. This is how REAL programmers do it.
-+#
-+# Well, now's the time to actually move into protected mode. To make
-+# things as simple as possible, we do no register set-up or anything,
-+# we let the gnu-compiled 32-bit programs do that. We just jump to
-+# absolute address 0x00000, in 32-bit protected mode.
-+	mov	%cr0, %eax	# get machine status(cr0|MSW)	
-+	bts	$0, %eax	# turn on the PE-bit 
-+	mov	%eax, %cr0	# protection enabled
-+				
-+				            # segment-descriptor        (INDEX:TI:RPL)
-+	.equ	sel_cs0, 0x0008 # select for code segment 0 (  001:0 :00) 
-+	ljmp	$sel_cs0, $0	# jmp offset 0 of code segment 0 in gdt
- 
+-
 -	mov	ax,#0x0001	! protected mode (PE) bit
 -	lmsw	ax		! This is it!
 -	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
@@ -2554,41 +1740,27 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	pop	ax
 -	ret	
 -	
- gdt:
+-gdt:
 -	.word	0,0,0,0		! dummy
-+	.word	0,0,0,0		# dummy
- 
+-
 -	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
 -	.word	0x0000		! base address=0
 -	.word	0x9A00		! code read/exec
 -	.word	0x00C0		! granularity=4096, 386
-+	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
-+	.word	0x0000		# base address=0
-+	.word	0x9A00		# code read/exec
-+	.word	0x00C0		# granularity=4096, 386
- 
+-
 -	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
 -	.word	0x0000		! base address=0
 -	.word	0x9200		! data read/write
 -	.word	0x00C0		! granularity=4096, 386
-+	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
-+	.word	0x0000		# base address=0
-+	.word	0x9200		# data read/write
-+	.word	0x00C0		# granularity=4096, 386
- 
- idt_48:
+-
+-idt_48:
 -	.word	0			! idt limit=0
 -	.word	0,0			! idt base=0L
-+	.word	0			# idt limit=0
-+	.word	0,0			# idt base=0L
- 
- gdt_48:
+-
+-gdt_48:
 -	.word	0x800		! gdt limit=2048, 256 GDT entries
 -	.word	512+gdt,0x9	! gdt base = 0X9xxxx
-+	.word	0x800			    # gdt limit=2048, 256 GDT entries
-+	.word   512+gdt, 0x9		# gdt base = 0X9xxxx, 
-+	# 512+gdt is the real gdt after setup is moved to 0x9020 * 0x10
- 
+-
 -msg1:		.ascii	"Press <RETURN> to see SVGA-modes available or any other key to continue."
 -		db	0x0d, 0x0a, 0x0a, 0x00
 -msg2:		.ascii	"Mode:  COLSxROWS:"
@@ -2600,30 +1772,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -idcandt:	.byte	0xa5
 -idgenoa:	.byte	0x77, 0x00, 0x66, 0x99
 -idparadise:	.ascii	"VGA="
-+# print_hex()
-+print_hex:
-+	mov $4,%cx
-+	mov %ax,%dx
-+print_digit:
-+	rol $4,%dx	    #循环以使低4位用上，高4位移至低4位
-+	mov $0xe0f,%ax  #ah ＝ 请求的功能值，al = 半个字节的掩码
-+	and %dl,%al
-+	add $0x30,%al
-+	cmp $0x3a,%al
-+	jl outp
-+	add $0x07,%al
-+outp:
-+	int $0x10
-+	loop print_digit
-+	ret
-+#打印回车换行
-+print_nl:
-+	mov $0xe0d,%ax
-+	int $0x10
-+	mov $0xa,%al
-+	int $0x10
-+	ret
- 
+-
 -! Manufacturer:	  Numofmodes:	Mode:
 -
 -moati:		.byte	0x02,	0x23, 0x33 
@@ -2650,44 +1799,16 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -dsctseng:	.word	0x503c, 0x6428, 0x8419, 0x841c, 0x842c
 -dscvideo7:	.word	0x502b, 0x503c, 0x643c, 0x8419, 0x842c, 0x841c
 -	
-+msg2:
-+	.byte 13,10
-+	.ascii "Now we are in setup ..."
-+	.byte 13,10
-+cur:
-+	.ascii "Cursor POS:"
-+mem:
-+	.ascii "Memory SIZE:"
-+cyl:
-+	.ascii "KB"
-+	.byte 13,10
-+	.ascii "HD Info:"
-+	.byte 13,10
-+	.ascii " Cylinders:"
-+head:
-+	.ascii " Headers:"
-+sect:
-+	.ascii " Secotrs:"
- .text
- endtext:
- .data
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/boot/setup.s patch-new/linux-0.12/boot/setup.s
---- patch-old/linux-0.12/boot/setup.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/boot/setup.s	2026-04-04 13:12:07
-@@ -1,628 +1,359 @@
--!
--!	setup.s		(C) 1991 Linus Torvalds
--!
--! setup.s is responsible for getting the system data from the BIOS,
--! and putting them into the appropriate places in system memory.
--! both setup.s and system has been loaded by the bootblock.
--!
--! This code asks the bios for memory/disk/other parameters, and
--! puts them in a "safe" place: 0x90000-0x901FF, ie where the
--! boot-block used to be. It is then up to the protected mode
--! system to read them from there before the area is overwritten
--! for buffer-blocks.
--!
+-.text
+-endtext:
+-.data
+-enddata:
+-.bss
+-endbss:
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/boot/setup.s patch-new/linux-0.12/boot/setup.s
+--- patch-old/linux-0.12/boot/setup.s	1970-01-01 00:00:00.000000000 +0000
++++ patch-new/linux-0.12/boot/setup.s	2026-04-04 05:10:32.041694154 +0000
+@@ -0,0 +1,362 @@
 +	.code16
 +# rewrite with AT&T syntax by falcon <wuzhangjin@gmail.com> at 081012
 +#
@@ -2703,26 +1824,13 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +# system to read them from there before the area is overwritten
 +# for buffer-blocks.
 +#
- 
--! NOTE! These had better be the same as in bootsect.s!
--#include <linux/config.h>
++
 +# NOTE! These had better be the same as in bootsect.s!
- 
--INITSEG  = DEF_INITSEG	! we move boot here - out of the way
--SYSSEG   = DEF_SYSSEG	! system loaded at 0x10000 (65536).
--SETUPSEG = DEF_SETUPSEG	! this is the current segment
++
 +	.equ INITSEG, 0x9000	# we move boot here - out of the way
 +	.equ SYSSEG, 0x1000	# system loaded at 0x10000 (65536).
 +	.equ SETUPSEG, 0x9020	# this is the current segment
- 
--.globl begtext, begdata, begbss, endtext, enddata, endbss
--.text
--begtext:
--.data
--begdata:
--.bss
--begbss:
--.text
++
 +	.global _start, begtext, begdata, begbss, endtext, enddata, endbss
 +	.text
 +	begtext:
@@ -2731,9 +1839,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	.bss
 +	begbss:
 +	.text
- 
--entry start
--start:
++
 +	ljmp $SETUPSEG, $_start	#phaddr: 0x90205
 +_start:
 +	mov %cs,%ax         #0x9020
@@ -2750,9 +1856,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov $msg2,%bp
 +	mov $0x1301, %ax
 +	int $0x10
- 
--! ok, the read went well so we get current cursor position and save it for
--! posterity.
++
 +# ok, the read went well so we get current cursor position and save it for
 +# posterity.
 +	mov	$INITSEG, %ax	# this is done in bootsect already, but...
@@ -2761,9 +1865,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	xor	%bh, %bh
 +	int	$0x10		    # save it in known place, con_init fetches
 +	mov	%dx, %ds:0	    # it from 0x90000.
- 
--	mov	ax,#INITSEG	! this is done in bootsect already, but...
--	mov	ds,ax
++
 +# Get memory size (extended mem, kB)
 +    mov $INITSEG, %ax
 +    mov %ax, %ds 
@@ -2771,8 +1873,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	int	$0x15
 +	mov	%ax, %ds:2      # save the value of extended memory size in 0x90002,
 +                        # which excludes 1MB. (it's 15MB in this case)
- 
--! Get memory size (extended mem, kB)
++
 +# Get video-card data:
 +    mov $INITSEG, %ax
 +    mov %ax, %ds 
@@ -2781,10 +1882,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	%bx, %ds:4	    # bh = display page (0x00)
 +	mov	%ax, %ds:6	    # al = video mode, ah = window width (0x50,0x03)
 +                        # 80x25(col*row)
- 
--	mov	ah,#0x88
--	int	0x15
--	mov	[2],ax
++
 +# check for EGA/VGA and some config parameters
 +    mov $INITSEG, %ax
 +    mov %ax, %ds
@@ -2794,44 +1892,12 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	%ax, %ds:8      # ???
 +	mov	%bx, %ds:10     # bh = video mode bl = video memory size(256KB)
 +	mov	%cx, %ds:12     # EGA 80x25
- 
--! check for EGA/VGA and some config parameters
++
 +    mov $0x5019, %ax    # 80x25
 +    mov %ax, %ds:14
- 
--	mov	ah,#0x12
--	mov	bl,#0x10
--	int	0x10
--	mov	[8],ax
--	mov	[10],bx
--	mov	[12],cx
--	mov	ax,#0x5019
--	cmp	bl,#0x10
--	je	novga
--	call	chsvga
--novga:	mov	[14],ax
--	mov	ah,#0x03	! read cursor pos
--	xor	bh,bh
--	int	0x10		! save it in known place, con_init fetches
--	mov	[0],dx		! it from 0x90000.
--	
--! Get video-card data:
--	
--	mov	ah,#0x0f
--	int	0x10
--	mov	[4],bx		! bh = display page
--	mov	[6],ax		! al = video mode, ah = window width
++
 +# Get hd0 data(fixed disk parameter table)
- 
--! Get hd0 data
--
--	mov	ax,#0x0000
--	mov	ds,ax
--	lds	si,[4*0x41]
--	mov	ax,#INITSEG
--	mov	es,ax
--	mov	di,#0x0080
--	mov	cx,#0x10
++
 +	mov	$0x0000, %ax
 +	mov	%ax, %ds
 +	lds	%ds:4*0x41, %si # src
@@ -2839,19 +1905,11 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	%ax, %es
 +	mov	$0x0080, %di    # dst: 0x90080
 +	mov	$0x10, %cx      # the size of FDPT is 16)
- 	rep
- 	movsb
- 
--! Get hd1 data
++	rep
++	movsb
++
 +# Get hd1 data
- 
--	mov	ax,#0x0000
--	mov	ds,ax
--	lds	si,[4*0x46]
--	mov	ax,#INITSEG
--	mov	es,ax
--	mov	di,#0x0090
--	mov	cx,#0x10
++
 +	mov	$0x0000, %ax
 +	mov	%ax, %ds
 +	lds	%ds:4*0x46, %si #
@@ -2859,19 +1917,15 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	%ax, %es
 +	mov	$0x0090, %di
 +	mov	$0x10, %cx
- 	rep
- 	movsb
- 
--! Check that there IS a hd1 :-)
++	rep
++	movsb
++
 +## modify ds
 +	mov $INITSEG,%ax
 +	mov %ax,%ds
 +	mov $SETUPSEG,%ax
 +	mov %ax,%es
- 
--	mov	ax,#0x01500
--	mov	dl,#0x81
--	int	0x13
++
 +##show cursor pos:
 +	mov $0x03, %ah 
 +	xor %bh,%bh
@@ -2946,93 +2000,54 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov	$0x01500, %ax
 +	mov	$0x81, %dl
 +	int	$0x13
- 	jc	no_disk1
--	cmp	ah,#3
++	jc	no_disk1
 +	cmp	$3, %ah
- 	je	is_disk1
- no_disk1:
--	mov	ax,#INITSEG
--	mov	es,ax
--	mov	di,#0x0090
--	mov	cx,#0x10
--	mov	ax,#0x00
--	rep
++	je	is_disk1
++no_disk1:
 +	mov	$INITSEG, %ax
 +	mov	%ax, %es
 +	mov	$0x0090, %di
 +	mov	$0x10, %cx
 +	mov	$0x00, %ax
 +	rep             # clear       
- 	stosb
- is_disk1:
- 
--! now we want to move to protected mode ...
++	stosb
++is_disk1:
++
 +# now we want to move to protected mode ...
- 
--	cli			! no interrupts allowed !
++
 +	cli			    # no interrupts allowed ! 
- 
--! first we move the system to it's rightful place
++
 +# first we move the system to its rightful place(load kernel module)
- 
--	mov	ax,#0x0000
--	cld			! 'direction'=0, movs moves forward
++
 +	mov	$0x0000, %ax
 +	cld			    # 'direction'=0, movs moves forward
- do_move:
--	mov	es,ax		! destination segment
--	add	ax,#0x1000
--	cmp	ax,#0x9000
++do_move:
 +	mov	%ax, %es	# destination segment
 +	add	$0x1000, %ax
 +	cmp	$0x9000, %ax # 0x9000 SYS_SIZE 
- 	jz	end_move
--	mov	ds,ax		! source segment
--	sub	di,di
--	sub	si,si
--	mov 	cx,#0x8000
++	jz	end_move
 +	mov	%ax, %ds	# source segment
 +	sub	%di, %di
 +	sub	%si, %si
 +	mov $0x8000, %cx
- 	rep
- 	movsw
- 	jmp	do_move
- 
--! then we load the segment descriptors
++	rep
++	movsw
++	jmp	do_move
++
 +# then we load the segment descriptors
- 
- end_move:
--	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
--	mov	ds,ax
--	lidt	idt_48		! load idt with 0,0
--	lgdt	gdt_48		! load gdt with whatever appropriate
++
++end_move:
 +	mov	$SETUPSEG, %ax	# right, forgot this at first. didn't work :-)
 +	mov	%ax, %ds        # 0x9020
 +	lidt idt_48		    # load idt with 0,0
 +	lgdt gdt_48		    # load gdt with whatever appropriate
- 
--! that was painless, now we enable A20
++
 +# that was painless, now we enable A20
- 
--	call	empty_8042
--	mov	al,#0xD1		! command write
--	out	#0x64,al
--	call	empty_8042
--	mov	al,#0xDF		! A20 on
--	out	#0x60,al
--	call	empty_8042
++
 +	inb     $0x92, %al	# open A20 line(Fast Gate A20).
 +	orb     $0b00000010, %al
 +	outb    %al, $0x92
- 
--! well, that went ok, I hope. Now we have to reprogram the interrupts :-(
--! we put them right after the intel-reserved hardware interrupts, at
--! int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
--! messed this up with the original PC, and they haven't been able to
--! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
--! which is used for the internal hardware interrupts as well. We just
--! have to reprogram the 8259's, and it isn't fun.
++
 +# well, that went ok, I hope. Now we have to reprogram the interrupts :-(
 +# we put them right after the intel-reserved hardware interrupts, at
 +# int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
@@ -3040,24 +2055,16 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +# rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
 +# which is used for the internal hardware interrupts as well. We just
 +# have to reprogram the 8259's, and it isn't fun.
- 
--	mov	al,#0x11		! initialization sequence
--	out	#0x20,al		! send it to 8259A-1
--	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
--	out	#0xA0,al		! and to 8259A-2
++
 +	mov	$0x11, %al		# initialization sequence(ICW1)
 +					    # ICW4 needed(1),CASCADE mode,Level-triggered
 +	out	%al, $0x20		# send it to 8259A-1
 +	.word   0x00eb,0x00eb		# jmp $+2, jmp $+2
 +	out	%al, $0xA0		# and to 8259A-2
- 	.word	0x00eb,0x00eb
--	mov	al,#0x20		! start of hardware int's (0x20)
--	out	#0x21,al
++	.word	0x00eb,0x00eb
 +	mov	$0x20, %al		# start of hardware int's (0x20)(ICW2)
 +	out	%al, $0x21		# from 0x20-0x27
- 	.word	0x00eb,0x00eb
--	mov	al,#0x28		! start of hardware int's 2 (0x28)
--	out	#0xA1,al
++	.word	0x00eb,0x00eb
 +	mov	$0x28, %al		# start of hardware int's 2 (0x28)
 +	out	%al, $0xA1		# from 0x28-0x2F
 +	.word	0x00eb,0x00eb		# IR 7654 3210
@@ -3066,38 +2073,17 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	.word	0x00eb,0x00eb		# INT
 +	mov	$0x02, %al		# 8259-2 is slave(010 --> 2)
 +	out	%al, $0xA1
- 	.word	0x00eb,0x00eb
--	mov	al,#0x04		! 8259-1 is master
--	out	#0x21,al
++	.word	0x00eb,0x00eb
 +	mov	$0x01, %al		# 8086 mode for both
 +	out	%al, $0x21
- 	.word	0x00eb,0x00eb
--	mov	al,#0x02		! 8259-2 is slave
--	out	#0xA1,al
++	.word	0x00eb,0x00eb
 +	out	%al, $0xA1
- 	.word	0x00eb,0x00eb
--	mov	al,#0x01		! 8086 mode for both
--	out	#0x21,al
++	.word	0x00eb,0x00eb
 +	mov	$0xFF, %al		# mask off all interrupts for now
 +	out	%al, $0x21
- 	.word	0x00eb,0x00eb
--	out	#0xA1,al
--	.word	0x00eb,0x00eb
--	mov	al,#0xFF		! mask off all interrupts for now
--	out	#0x21,al
--	.word	0x00eb,0x00eb
--	out	#0xA1,al
++	.word	0x00eb,0x00eb
 +	out	%al, $0xA1
- 
--! well, that certainly wasn't fun :-(. Hopefully it works, and we don't
--! need no steenking BIOS anyway (except for the initial loading :-).
--! The BIOS-routine wants lots of unnecessary data, and it's less
--! "interesting" anyway. This is how REAL programmers do it.
--!
--! Well, now's the time to actually move into protected mode. To make
--! things as simple as possible, we do no register set-up or anything,
--! we let the gnu-compiled 32-bit programs do that. We just jump to
--! absolute address 0x00000, in 32-bit protected mode.
++
 +# well, that certainly wasn't fun :-(. Hopefully it works, and we don't
 +# need no steenking BIOS anyway (except for the initial loading :-).
 +# The BIOS-routine wants lots of unnecessary data, and it's less
@@ -3114,423 +2100,29 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +				            # segment-descriptor        (INDEX:TI:RPL)
 +	.equ	sel_cs0, 0x0008 # select for code segment 0 (  001:0 :00) 
 +	ljmp	$sel_cs0, $0	# jmp offset 0 of code segment 0 in gdt
- 
--	mov	ax,#0x0001	! protected mode (PE) bit
--	lmsw	ax		! This is it!
--	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
--
--! This routine checks that the keyboard command queue is empty
--! No timeout is used - if this hangs there is something wrong with
--! the machine, and we probably couldn't proceed anyway.
--empty_8042:
--	.word	0x00eb,0x00eb
--	in	al,#0x64	! 8042 status port
--	test	al,#2		! is input buffer full?
--	jnz	empty_8042	! yes - loop
--	ret
--
--! Routine trying to recognize type of SVGA-board present (if any)
--! and if it recognize one gives the choices of resolution it offers.
--! If one is found the resolution chosen is given by al,ah (rows,cols).
--
--chsvga:	cld
--	push	ds
--	push	cs
--	pop	ds
--	mov 	ax,#0xc000
--	mov	es,ax
--	lea	si,msg1
--	call	prtstr
--nokey:	in	al,#0x60
--	cmp	al,#0x82
--	jb	nokey
--	cmp	al,#0xe0
--	ja	nokey
--	cmp	al,#0x9c
--	je	svga
--	mov	ax,#0x5019
--	pop	ds
--	ret
--svga:	lea 	si,idati		! Check ATI 'clues'
--	mov	di,#0x31
--	mov 	cx,#0x09
--	repe
--	cmpsb
--	jne	noati
--	lea	si,dscati
--	lea	di,moati
--	lea	cx,selmod
--	jmp	cx
--noati:	mov	ax,#0x200f		! Check Ahead 'clues'
--	mov	dx,#0x3ce
--	out	dx,ax
--	inc	dx
--	in	al,dx
--	cmp	al,#0x20
--	je	isahed
--	cmp	al,#0x21
--	jne	noahed
--isahed:	lea	si,dscahead
--	lea	di,moahead
--	lea	cx,selmod
--	jmp	cx
--noahed:	mov	dx,#0x3c3		! Check Chips & Tech. 'clues'
--	in	al,dx
--	or	al,#0x10
--	out	dx,al
--	mov	dx,#0x104		
--	in	al,dx
--	mov	bl,al
--	mov	dx,#0x3c3
--	in	al,dx
--	and	al,#0xef
--	out	dx,al
--	cmp	bl,[idcandt]
--	jne	nocant
--	lea	si,dsccandt
--	lea	di,mocandt
--	lea	cx,selmod
--	jmp	cx
--nocant:	mov	dx,#0x3d4		! Check Cirrus 'clues'
--	mov	al,#0x0c
--	out	dx,al
--	inc	dx
--	in	al,dx
--	mov	bl,al
--	xor	al,al
--	out	dx,al
--	dec	dx
--	mov	al,#0x1f
--	out	dx,al
--	inc	dx
--	in	al,dx
--	mov	bh,al
--	xor	ah,ah
--	shl	al,#4
--	mov	cx,ax
--	mov	al,bh
--	shr	al,#4
--	add	cx,ax
--	shl	cx,#8
--	add	cx,#6
--	mov	ax,cx
--	mov	dx,#0x3c4
--	out	dx,ax
--	inc	dx
--	in	al,dx
--	and	al,al
--	jnz	nocirr
--	mov	al,bh
--	out	dx,al
--	in	al,dx
--	cmp	al,#0x01
--	jne	nocirr
--	call	rst3d4	
--	lea	si,dsccirrus
--	lea	di,mocirrus
--	lea	cx,selmod
--	jmp	cx
--rst3d4:	mov	dx,#0x3d4
--	mov	al,bl
--	xor	ah,ah
--	shl	ax,#8
--	add	ax,#0x0c
--	out	dx,ax
--	ret	
--nocirr:	call	rst3d4			! Check Everex 'clues'
--	mov	ax,#0x7000
--	xor	bx,bx
--	int	0x10
--	cmp	al,#0x70
--	jne	noevrx
--	shr	dx,#4
--	cmp	dx,#0x678
--	je	istrid
--	cmp	dx,#0x236
--	je	istrid
--	lea	si,dsceverex
--	lea	di,moeverex
--	lea	cx,selmod
--	jmp	cx
--istrid:	lea	cx,ev2tri
--	jmp	cx
--noevrx:	lea	si,idgenoa		! Check Genoa 'clues'
--	xor 	ax,ax
--	seg es
--	mov	al,[0x37]
--	mov	di,ax
--	mov	cx,#0x04
--	dec	si
--	dec	di
--l1:	inc	si
--	inc	di
--	mov	al,(si)
--	seg es
--	and	al,(di)
--	cmp	al,(si)
--	loope 	l1
--	cmp	cx,#0x00
--	jne	nogen
--	lea	si,dscgenoa
--	lea	di,mogenoa
--	lea	cx,selmod
--	jmp	cx
--nogen:	lea	si,idparadise		! Check Paradise 'clues'
--	mov	di,#0x7d
--	mov	cx,#0x04
--	repe
--	cmpsb
--	jne	nopara
--	lea	si,dscparadise
--	lea	di,moparadise
--	lea	cx,selmod
--	jmp	cx
--nopara:	mov	dx,#0x3c4		! Check Trident 'clues'
--	mov	al,#0x0e
--	out	dx,al
--	inc	dx
--	in	al,dx
--	xchg	ah,al
--	mov	al,#0x00
--	out	dx,al
--	in	al,dx
--	xchg	al,ah
--	mov	bl,al		! Strange thing ... in the book this wasn't
--	and	bl,#0x02	! necessary but it worked on my card which
--	jz	setb2		! is a trident. Without it the screen goes
--	and	al,#0xfd	! blurred ...
--	jmp	clrb2		!
--setb2:	or	al,#0x02	!
--clrb2:	out	dx,al
--	and	ah,#0x0f
--	cmp	ah,#0x02
--	jne	notrid
--ev2tri:	lea	si,dsctrident
--	lea	di,motrident
--	lea	cx,selmod
--	jmp	cx
--notrid:	mov	dx,#0x3cd		! Check Tseng 'clues'
--	in	al,dx			! Could things be this simple ! :-)
--	mov	bl,al
--	mov	al,#0x55
--	out	dx,al
--	in	al,dx
--	mov	ah,al
--	mov	al,bl
--	out	dx,al
--	cmp	ah,#0x55
-- 	jne	notsen
--	lea	si,dsctseng
--	lea	di,motseng
--	lea	cx,selmod
--	jmp	cx
--notsen:	mov	dx,#0x3cc		! Check Video7 'clues'
--	in	al,dx
--	mov	dx,#0x3b4
--	and	al,#0x01
--	jz	even7
--	mov	dx,#0x3d4
--even7:	mov	al,#0x0c
--	out	dx,al
--	inc	dx
--	in	al,dx
--	mov	bl,al
--	mov	al,#0x55
--	out	dx,al
--	in	al,dx
--	dec	dx
--	mov	al,#0x1f
--	out	dx,al
--	inc	dx
--	in	al,dx
--	mov	bh,al
--	dec	dx
--	mov	al,#0x0c
--	out	dx,al
--	inc	dx
--	mov	al,bl
--	out	dx,al
--	mov	al,#0x55
--	xor	al,#0xea
--	cmp	al,bh
--	jne	novid7
--	lea	si,dscvideo7
--	lea	di,movideo7
--selmod:	push	si
--	lea	si,msg2
--	call	prtstr
--	xor	cx,cx
--	mov	cl,(di)
--	pop	si
--	push	si
--	push	cx
--tbl:	pop	bx
--	push	bx
--	mov	al,bl
--	sub	al,cl
--	call	dprnt
--	call	spcing
--	lodsw
--	xchg	al,ah
--	call	dprnt
--	xchg	ah,al
--	push	ax
--	mov	al,#0x78
--	call	prnt1
--	pop	ax
--	call	dprnt
--	call	docr
--	loop	tbl
--	pop	cx
--	call	docr
--	lea	si,msg3
--	call	prtstr
--	pop	si
--	add	cl,#0x80
--nonum:	in	al,#0x60	! Quick and dirty...
--	cmp	al,#0x82
--	jb	nonum
--	cmp	al,#0x8b
--	je	zero
--	cmp	al,cl
--	ja	nonum
--	jmp	nozero
--zero:	sub	al,#0x0a
--nozero:	sub	al,#0x80
--	dec	al
--	xor	ah,ah
--	add	di,ax
--	inc	di
--	push	ax
--	mov	al,(di)
--	int 	0x10
--	pop	ax
--	shl	ax,#1
--	add	si,ax
--	lodsw
--	pop	ds
--	ret
--novid7:	pop	ds	! Here could be code to support standard 80x50,80x30
--	mov	ax,#0x5019	
--	ret
--
--! Routine that 'tabs' to next col.
--
--spcing:	mov	al,#0x2e
--	call	prnt1
--	mov	al,#0x20
--	call	prnt1	
--	mov	al,#0x20
--	call	prnt1	
--	mov	al,#0x20
--	call	prnt1	
--	mov	al,#0x20
--	call	prnt1
--	ret	
--
--! Routine to print asciiz-string at DS:SI
--
--prtstr:	lodsb
--	and	al,al
--	jz	fin
--	call	prnt1
--	jmp	prtstr
--fin:	ret
--
--! Routine to print a decimal value on screen, the value to be
--! printed is put in al (i.e 0-255). 
--
--dprnt:	push	ax
--	push	cx
--	mov	ah,#0x00		
--	mov	cl,#0x0a
--	idiv	cl
--	cmp	al,#0x09
--	jbe	lt100
--	call	dprnt
--	jmp	skip10
--lt100:	add	al,#0x30
--	call	prnt1
--skip10:	mov	al,ah
--	add	al,#0x30
--	call	prnt1	
--	pop	cx
--	pop	ax
--	ret
--
--! Part of above routine, this one just prints ascii al
--
--prnt1:	push	ax
--	push	cx
--	mov	bh,#0x00
--	mov	cx,#0x01
--	mov	ah,#0x0e
--	int	0x10
--	pop	cx
--	pop	ax
--	ret
--
--! Prints <CR> + <LF>
--
--docr:	push	ax
--	push	cx
--	mov	bh,#0x00
--	mov	ah,#0x0e
--	mov	al,#0x0a
--	mov	cx,#0x01
--	int	0x10
--	mov	al,#0x0d
--	int	0x10
--	pop	cx
--	pop	ax
--	ret	
--	
- gdt:
--	.word	0,0,0,0		! dummy
++
++gdt:
 +	.word	0,0,0,0		# dummy
- 
--	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
--	.word	0x0000		! base address=0
--	.word	0x9A00		! code read/exec
--	.word	0x00C0		! granularity=4096, 386
++
 +	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
 +	.word	0x0000		# base address=0
 +	.word	0x9A00		# code read/exec
 +	.word	0x00C0		# granularity=4096, 386
- 
--	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
--	.word	0x0000		! base address=0
--	.word	0x9200		! data read/write
--	.word	0x00C0		! granularity=4096, 386
++
 +	.word	0x07FF		# 8Mb - limit=2047 (2048*4096=8Mb)
 +	.word	0x0000		# base address=0
 +	.word	0x9200		# data read/write
 +	.word	0x00C0		# granularity=4096, 386
- 
- idt_48:
--	.word	0			! idt limit=0
--	.word	0,0			! idt base=0L
++
++idt_48:
 +	.word	0			# idt limit=0
 +	.word	0,0			# idt base=0L
- 
- gdt_48:
--	.word	0x800		! gdt limit=2048, 256 GDT entries
--	.word	512+gdt,0x9	! gdt base = 0X9xxxx
++
++gdt_48:
 +	.word	0x800			    # gdt limit=2048, 256 GDT entries
 +	.word   512+gdt, 0x9		# gdt base = 0X9xxxx, 
 +	# 512+gdt is the real gdt after setup is moved to 0x9020 * 0x10
- 
--msg1:		.ascii	"Press <RETURN> to see SVGA-modes available or any other key to continue."
--		db	0x0d, 0x0a, 0x0a, 0x00
--msg2:		.ascii	"Mode:  COLSxROWS:"
--		db	0x0d, 0x0a, 0x0a, 0x00
--msg3:		.ascii	"Choose mode by pressing the corresponding number."
--		db	0x0d, 0x0a, 0x00
--		
--idati:		.ascii	"761295520"
--idcandt:	.byte	0xa5
--idgenoa:	.byte	0x77, 0x00, 0x66, 0x99
--idparadise:	.ascii	"VGA="
++
 +# print_hex()
 +print_hex:
 +	mov $4,%cx
@@ -3554,33 +2146,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	mov $0xa,%al
 +	int $0x10
 +	ret
- 
--! Manufacturer:	  Numofmodes:	Mode:
--
--moati:		.byte	0x02,	0x23, 0x33 
--moahead:	.byte	0x05,	0x22, 0x23, 0x24, 0x2f, 0x34
--mocandt:	.byte	0x02,	0x60, 0x61
--mocirrus:	.byte	0x04,	0x1f, 0x20, 0x22, 0x31
--moeverex:	.byte	0x0a,	0x03, 0x04, 0x07, 0x08, 0x0a, 0x0b, 0x16, 0x18, 0x21, 0x40
--mogenoa:	.byte	0x0a,	0x58, 0x5a, 0x60, 0x61, 0x62, 0x63, 0x64, 0x72, 0x74, 0x78
--moparadise:	.byte	0x02,	0x55, 0x54
--motrident:	.byte	0x07,	0x50, 0x51, 0x52, 0x57, 0x58, 0x59, 0x5a
--motseng:	.byte	0x05,	0x26, 0x2a, 0x23, 0x24, 0x22
--movideo7:	.byte	0x06,	0x40, 0x43, 0x44, 0x41, 0x42, 0x45
--
--!			msb = Cols lsb = Rows:
--
--dscati:		.word	0x8419, 0x842c
--dscahead:	.word	0x842c, 0x8419, 0x841c, 0xa032, 0x5042
--dsccandt:	.word	0x8419, 0x8432
--dsccirrus:	.word	0x8419, 0x842c, 0x841e, 0x6425
--dsceverex:	.word	0x5022, 0x503c, 0x642b, 0x644b, 0x8419, 0x842c, 0x501e, 0x641b, 0xa040, 0x841e
--dscgenoa:	.word	0x5020, 0x642a, 0x8419, 0x841d, 0x8420, 0x842c, 0x843c, 0x503c, 0x5042, 0x644b
--dscparadise:	.word	0x8419, 0x842b
--dsctrident:	.word 	0x501e, 0x502b, 0x503c, 0x8419, 0x841e, 0x842b, 0x843c
--dsctseng:	.word	0x503c, 0x6428, 0x8419, 0x841c, 0x842c
--dscvideo7:	.word	0x502b, 0x503c, 0x643c, 0x8419, 0x842c, 0x841c
--	
++
 +msg2:
 +	.byte 13,10
 +	.ascii "Now we are in setup ..."
@@ -3599,12 +2165,15 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	.ascii " Headers:"
 +sect:
 +	.ascii " Secotrs:"
- .text
- endtext:
- .data
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/Makefile patch-new/linux-0.12/fs/Makefile
---- patch-old/linux-0.12/fs/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/fs/Makefile	2026-04-04 13:12:07
++.text
++endtext:
++.data
++enddata:
++.bss
++endbss:
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/fs/Makefile patch-new/linux-0.12/fs/Makefile
+--- patch-old/linux-0.12/fs/Makefile	1992-01-12 19:49:06.000000000 +0000
++++ patch-new/linux-0.12/fs/Makefile	2026-04-04 05:10:32.041786196 +0000
 @@ -1,16 +1,14 @@
 -AR	=gar
 -AS	=gas
@@ -3614,11 +2183,11 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	-fno-defer-pop -mstring-insns -nostdinc -I../include
 -CPP	=gcc -E -nostdinc -I../include
 +include ../Makefile.header
- 
++
 +LDFLAGS += -r
 +CFLAGS	+= -I../include
 +CPP	+= -I../include
-+
+ 
  .c.s:
 -	$(CC) $(CFLAGS) \
 +	@$(CC) $(CFLAGS) \
@@ -3795,9 +2364,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -  ../include/sys/time.h ../include/time.h ../include/sys/resource.h \
 -  ../include/sys/stat.h 
 +  ../include/signal.h ../include/sys/stat.h
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/bitmap.c patch-new/linux-0.12/fs/bitmap.c
---- patch-old/linux-0.12/fs/bitmap.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/fs/bitmap.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/fs/bitmap.c patch-new/linux-0.12/fs/bitmap.c
+--- patch-old/linux-0.12/fs/bitmap.c	1992-01-11 19:57:29.000000000 +0000
++++ patch-new/linux-0.12/fs/bitmap.c	2026-04-04 05:10:32.041835613 +0000
 @@ -14,7 +14,7 @@
  __asm__("cld\n\t" \
  	"rep\n\t" \
@@ -3816,9 +2385,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  __res;})
  
  int free_block(int dev, int block)
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/buffer.c patch-new/linux-0.12/fs/buffer.c
---- patch-old/linux-0.12/fs/buffer.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/fs/buffer.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/fs/buffer.c patch-new/linux-0.12/fs/buffer.c
+--- patch-old/linux-0.12/fs/buffer.c	1991-12-06 20:21:00.000000000 +0000
++++ patch-new/linux-0.12/fs/buffer.c	2026-04-04 05:10:32.041944655 +0000
 @@ -285,7 +285,7 @@
  	"rep\n\t" \
  	"movsl\n\t" \
@@ -3828,9 +2397,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  /*
   * bread_page reads four buffers into memory at the desired address. It's
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/exec.c patch-new/linux-0.12/fs/exec.c
---- patch-old/linux-0.12/fs/exec.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/fs/exec.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/fs/exec.c patch-new/linux-0.12/fs/exec.c
+--- patch-old/linux-0.12/fs/exec.c	1992-01-13 23:36:33.000000000 +0000
++++ patch-new/linux-0.12/fs/exec.c	2026-04-04 05:10:32.042058614 +0000
 @@ -159,8 +159,7 @@
  				if (from_kmem==2)
  					set_fs(old_fs);
@@ -3841,9 +2410,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  					return 0;
  				if (from_kmem==2)
  					set_fs(new_fs);
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/fs/namei.c patch-new/linux-0.12/fs/namei.c
---- patch-old/linux-0.12/fs/namei.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/fs/namei.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/fs/namei.c patch-new/linux-0.12/fs/namei.c
+--- patch-old/linux-0.12/fs/namei.c	1992-01-12 04:09:58.000000000 +0000
++++ patch-new/linux-0.12/fs/namei.c	2026-04-04 05:10:32.042393824 +0000
 @@ -79,7 +79,7 @@
  		"setz %%al"
  		:"=a" (same)
@@ -3853,9 +2422,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	return same;
  }
  
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/io.h patch-new/linux-0.12/include/asm/io.h
---- patch-old/linux-0.12/include/asm/io.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/asm/io.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/asm/io.h patch-new/linux-0.12/include/asm/io.h
+--- patch-old/linux-0.12/include/asm/io.h	1991-08-07 10:17:51.000000000 +0000
++++ patch-new/linux-0.12/include/asm/io.h	2026-04-04 05:10:32.086537697 +0000
 @@ -9,11 +9,12 @@
  })
  
@@ -3870,9 +2439,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  #define inb_p(port) ({ \
  unsigned char _v; \
  __asm__ volatile ("inb %%dx,%%al\n" \
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/memory.h patch-new/linux-0.12/include/asm/memory.h
---- patch-old/linux-0.12/include/asm/memory.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/asm/memory.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/asm/memory.h patch-new/linux-0.12/include/asm/memory.h
+--- patch-old/linux-0.12/include/asm/memory.h	1991-06-15 20:54:44.000000000 +0000
++++ patch-new/linux-0.12/include/asm/memory.h	2026-04-04 05:10:32.086587864 +0000
 @@ -9,6 +9,6 @@
  void * _res = dest; \
  __asm__ ("cld;rep;movsb" \
@@ -3881,9 +2450,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	); \
  _res; \
  })
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/segment.h patch-new/linux-0.12/include/asm/segment.h
---- patch-old/linux-0.12/include/asm/segment.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/asm/segment.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/asm/segment.h patch-new/linux-0.12/include/asm/segment.h
+--- patch-old/linux-0.12/include/asm/segment.h	1991-11-25 18:48:24.000000000 +0000
++++ patch-new/linux-0.12/include/asm/segment.h	2026-04-04 05:10:32.086636531 +0000
 @@ -1,4 +1,7 @@
 -extern inline unsigned char get_fs_byte(const char * addr)
 +//#ifndef _SEGMENT_H
@@ -3959,9 +2528,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  }
  
 +//#endif
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/asm/system.h patch-new/linux-0.12/include/asm/system.h
---- patch-old/linux-0.12/include/asm/system.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/asm/system.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/asm/system.h patch-new/linux-0.12/include/asm/system.h
+--- patch-old/linux-0.12/include/asm/system.h	1992-01-13 13:02:10.000000000 +0000
++++ patch-new/linux-0.12/include/asm/system.h	2026-04-04 05:10:32.086681990 +0000
 @@ -11,7 +11,7 @@
  	"mov %%ax,%%es\n\t" \
  	"mov %%ax,%%fs\n\t" \
@@ -3971,9 +2540,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  #define sti() __asm__ ("sti"::)
  #define cli() __asm__ ("cli"::)
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/config.h patch-new/linux-0.12/include/linux/config.h
---- patch-old/linux-0.12/include/linux/config.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/linux/config.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/linux/config.h patch-new/linux-0.12/include/linux/config.h
+--- patch-old/linux-0.12/include/linux/config.h	1992-01-11 00:13:18.000000000 +0000
++++ patch-new/linux-0.12/include/linux/config.h	2026-04-04 05:10:32.086949283 +0000
 @@ -6,9 +6,9 @@
   */
  #define UTS_SYSNAME "Linux"
@@ -3986,9 +2555,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  /* Don't touch these, unless you really know what your doing. */
  #define DEF_INITSEG	0x9000
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/kernel.h patch-new/linux-0.12/include/linux/kernel.h
---- patch-old/linux-0.12/include/linux/kernel.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/linux/kernel.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/linux/kernel.h patch-new/linux-0.12/include/linux/kernel.h
+--- patch-old/linux-0.12/include/linux/kernel.h	1992-01-12 02:17:34.000000000 +0000
++++ patch-new/linux-0.12/include/linux/kernel.h	2026-04-04 05:10:32.087203534 +0000
 @@ -2,8 +2,8 @@
   * 'kernel.h' contains some often-used function prototypes etc
   */
@@ -4000,9 +2569,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  int printf(const char * fmt, ...);
  int printk(const char * fmt, ...);
  void console_print(const char * str);
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/math_emu.h patch-new/linux-0.12/include/linux/math_emu.h
---- patch-old/linux-0.12/include/linux/math_emu.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/linux/math_emu.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/linux/math_emu.h patch-new/linux-0.12/include/linux/math_emu.h
+--- patch-old/linux-0.12/include/linux/math_emu.h	1992-01-01 17:33:04.000000000 +0000
++++ patch-new/linux-0.12/include/linux/math_emu.h	2026-04-04 05:10:32.087267867 +0000
 @@ -50,7 +50,7 @@
  void __math_abort(struct info *, unsigned int);
  
@@ -4012,9 +2581,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  /*
   * Gcc forces this stupid alignment problem: I want to use only two longs
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/mm.h patch-new/linux-0.12/include/linux/mm.h
---- patch-old/linux-0.12/include/linux/mm.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/linux/mm.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/linux/mm.h patch-new/linux-0.12/include/linux/mm.h
+--- patch-old/linux-0.12/include/linux/mm.h	1992-01-13 15:46:41.000000000 +0000
++++ patch-new/linux-0.12/include/linux/mm.h	2026-04-04 05:10:32.087316326 +0000
 @@ -17,7 +17,7 @@
  void swap_free(int page_nr);
  void swap_in(unsigned long *table_ptr);
@@ -4024,9 +2593,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  {
  	printk("out of memory\n\r");
  	do_exit(SIGSEGV);
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/linux/sched.h patch-new/linux-0.12/include/linux/sched.h
---- patch-old/linux-0.12/include/linux/sched.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/linux/sched.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/linux/sched.h patch-new/linux-0.12/include/linux/sched.h
+--- patch-old/linux-0.12/include/linux/sched.h	1992-01-13 22:24:42.000000000 +0000
++++ patch-new/linux-0.12/include/linux/sched.h	2026-04-04 05:10:32.087380993 +0000
 @@ -91,26 +91,26 @@
  	long	ebp;
  	long	esi;
@@ -4148,9 +2717,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  #define get_base(ldt) _get_base( ((char *)&(ldt)) )
  
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/string.h patch-new/linux-0.12/include/string.h
---- patch-old/linux-0.12/include/string.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/string.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/string.h patch-new/linux-0.12/include/string.h
+--- patch-old/linux-0.12/include/string.h	1991-09-17 15:04:09.000000000 +0000
++++ patch-new/linux-0.12/include/string.h	2026-04-04 05:10:32.087673619 +0000
 @@ -31,7 +31,7 @@
  	"stosb\n\t"
  	"testb %%al,%%al\n\t"
@@ -4329,9 +2898,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  return s;
  }
  
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/include/unistd.h patch-new/linux-0.12/include/unistd.h
---- patch-old/linux-0.12/include/unistd.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/include/unistd.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/include/unistd.h patch-new/linux-0.12/include/unistd.h
+--- patch-old/linux-0.12/include/unistd.h	1992-01-13 22:48:52.000000000 +0000
++++ patch-new/linux-0.12/include/unistd.h	2026-04-04 05:10:32.088236289 +0000
 @@ -207,7 +207,7 @@
  int acct(const char * filename);
  int alarm(int sec);
@@ -4375,9 +2944,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  time_t time(time_t * tloc);
  time_t times(struct tms * tbuf);
  int ulimit(int cmd, long limit);
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/init/Makefile patch-new/linux-0.12/init/Makefile
---- patch-old/linux-0.12/init/Makefile	1970-01-01 08:00:00
-+++ patch-new/linux-0.12/init/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/init/Makefile patch-new/linux-0.12/init/Makefile
+--- patch-old/linux-0.12/init/Makefile	1970-01-01 00:00:00.000000000 +0000
++++ patch-new/linux-0.12/init/Makefile	2026-04-04 05:10:32.088357081 +0000
 @@ -0,0 +1,30 @@
 +include ../Makefile.head
 +
@@ -4409,9 +2978,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 + ../include/linux/fs.h ../include/linux/mm.h ../include/signal.h \
 + ../include/asm/system.h ../include/asm/io.h ../include/stddef.h \
 + ../include/stdarg.h ../include/fcntl.h
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/init/main.c patch-new/linux-0.12/init/main.c
---- patch-old/linux-0.12/init/main.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/init/main.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/init/main.c patch-new/linux-0.12/init/main.c
+--- patch-old/linux-0.12/init/main.c	1992-01-13 12:45:44.000000000 +0000
++++ patch-new/linux-0.12/init/main.c	2026-04-04 05:10:32.088422165 +0000
 @@ -20,8 +20,11 @@
   * won't be any messing with the stack from main(), but we define
   * some others too.
@@ -4502,9 +3071,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	setup((void *) &drive_info);
  	(void) open("/dev/tty1",O_RDWR,0);
  	(void) dup(0);
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/init/main.s patch-new/linux-0.12/init/main.s
---- patch-old/linux-0.12/init/main.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/init/main.s	1970-01-01 08:00:00
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/init/main.s patch-new/linux-0.12/init/main.s
+--- patch-old/linux-0.12/init/main.s	1992-01-13 12:45:48.000000000 +0000
++++ patch-new/linux-0.12/init/main.s	1970-01-01 00:00:00.000000000 +0000
 @@ -1,551 +0,0 @@
 -	.file	"init/main.c"
 -gcc_compiled.:
@@ -5057,9 +3626,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -.comm _drive_info,32
 -.lcomm _term,32
 -.lcomm _printbuf,1024
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/Makefile patch-new/linux-0.12/kernel/Makefile
---- patch-old/linux-0.12/kernel/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/Makefile patch-new/linux-0.12/kernel/Makefile
+--- patch-old/linux-0.12/kernel/Makefile	1992-01-12 19:49:12.000000000 +0000
++++ patch-new/linux-0.12/kernel/Makefile	2026-04-04 05:10:32.088511248 +0000
 @@ -6,22 +6,29 @@
  # unless it's something special (ie not a .c file).
  #
@@ -5073,7 +3642,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	-finline-functions -mstring-insns -nostdinc -I../include
 -CPP	=gcc -E -nostdinc -I../include
 +include ../Makefile.header
- 
++
 +LDFLAGS	+= -r
 +
 +# NOTE!: do not try to add -On to CFLAGS with gcc4.x, which will optimize the
@@ -5087,7 +3656,7 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +CFLAGS	+= -I../include
 +
 +CPP	+= -I../include
-+
+ 
  .c.s:
 -	$(CC) $(CFLAGS) \
 +	@$(CC) $(CFLAGS) \
@@ -5202,9 +3771,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +  ../include/asm/system.h ../include/asm/segment.h ../include/asm/io.h
 +vsprintf.s vsprintf.o: vsprintf.c ../include/stdarg.h ../include/string.h
 +who.s who.o: who.c ../include/linux/kernel.h ../include/unistd.h 
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/asm.s patch-new/linux-0.12/kernel/asm.s
---- patch-old/linux-0.12/kernel/asm.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/asm.s	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/asm.s patch-new/linux-0.12/kernel/asm.s
+--- patch-old/linux-0.12/kernel/asm.s	1991-12-18 16:40:03.000000000 +0000
++++ patch-new/linux-0.12/kernel/asm.s	2026-04-04 05:10:32.088559957 +0000
 @@ -11,14 +11,14 @@
   * the fpu must be properly saved/resored. This hasn't been tested.
   */
@@ -5332,9 +3901,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	pushl $do_alignment_check
  	jmp error_code
  
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/Makefile patch-new/linux-0.12/kernel/blk_drv/Makefile
---- patch-old/linux-0.12/kernel/blk_drv/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/blk_drv/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/blk_drv/Makefile patch-new/linux-0.12/kernel/blk_drv/Makefile
+--- patch-old/linux-0.12/kernel/blk_drv/Makefile	1992-01-12 19:49:21.000000000 +0000
++++ patch-new/linux-0.12/kernel/blk_drv/Makefile	2026-04-04 05:10:32.088637666 +0000
 @@ -6,66 +6,57 @@
  # unless it's something special (ie not a .c file).
  #
@@ -5348,10 +3917,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	-finline-functions -mstring-insns -nostdinc -I../../include
 -CPP	=gcc -E -nostdinc -I../../include
 +include ../../Makefile.header
- 
++
 +CFLAGS	+= -I../../include
 +CPP	+= -I../../include
-+
+ 
  .c.s:
 -	$(CC) $(CFLAGS) \
 +	@$(CC) $(CFLAGS) \
@@ -5420,6 +3989,11 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +  ../../include/linux/hdreg.h ../../include/asm/system.h \
 +  ../../include/asm/io.h ../../include/asm/segment.h blk.h
 +ll_rw_blk.s ll_rw_blk.o: ll_rw_blk.c ../../include/errno.h \
++  ../../include/linux/sched.h ../../include/linux/head.h \
++  ../../include/linux/fs.h ../../include/sys/types.h \
++  ../../include/linux/mm.h ../../include/signal.h \
++  ../../include/linux/kernel.h ../../include/asm/system.h blk.h
++ramdisk.s ramdisk.o: ramdisk.c ../../include/string.h ../../include/linux/config.h \
    ../../include/linux/sched.h ../../include/linux/head.h \
 -  ../../include/linux/fs.h ../../include/sys/types.h ../../include/linux/mm.h \
 -  ../../include/linux/kernel.h ../../include/signal.h \
@@ -5428,16 +4002,11 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -  ../../include/asm/segment.h ../../include/asm/memory.h blk.h 
 +  ../../include/linux/fs.h ../../include/sys/types.h \
 +  ../../include/linux/mm.h ../../include/signal.h \
-+  ../../include/linux/kernel.h ../../include/asm/system.h blk.h
-+ramdisk.s ramdisk.o: ramdisk.c ../../include/string.h ../../include/linux/config.h \
-+  ../../include/linux/sched.h ../../include/linux/head.h \
-+  ../../include/linux/fs.h ../../include/sys/types.h \
-+  ../../include/linux/mm.h ../../include/signal.h \
 +  ../../include/linux/kernel.h ../../include/asm/system.h \
 +  ../../include/asm/segment.h ../../include/asm/memory.h blk.h
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/blk.h patch-new/linux-0.12/kernel/blk_drv/blk.h
---- patch-old/linux-0.12/kernel/blk_drv/blk.h	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/blk_drv/blk.h	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/blk_drv/blk.h patch-new/linux-0.12/kernel/blk_drv/blk.h
+--- patch-old/linux-0.12/kernel/blk_drv/blk.h	1991-12-26 20:02:50.000000000 +0000
++++ patch-new/linux-0.12/kernel/blk_drv/blk.h	2026-04-04 05:10:32.088691624 +0000
 @@ -87,7 +87,7 @@
  #define DEVICE_ON(device)
  #define DEVICE_OFF(device)
@@ -5465,9 +4034,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  {
  	DEVICE_OFF(CURRENT->dev);
  	if (CURRENT->bh) {
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/floppy.c patch-new/linux-0.12/kernel/blk_drv/floppy.c
---- patch-old/linux-0.12/kernel/blk_drv/floppy.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/blk_drv/floppy.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/blk_drv/floppy.c patch-new/linux-0.12/kernel/blk_drv/floppy.c
+--- patch-old/linux-0.12/kernel/blk_drv/floppy.c	1992-01-10 03:45:33.000000000 +0000
++++ patch-new/linux-0.12/kernel/blk_drv/floppy.c	2026-04-04 05:10:32.088768041 +0000
 @@ -156,7 +156,7 @@
  #define copy_buffer(from,to) \
  __asm__("cld ; rep ; movsl" \
@@ -5477,9 +4046,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  static void setup_DMA(void)
  {
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/hd.c patch-new/linux-0.12/kernel/blk_drv/hd.c
---- patch-old/linux-0.12/kernel/blk_drv/hd.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/blk_drv/hd.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/blk_drv/hd.c patch-new/linux-0.12/kernel/blk_drv/hd.c
+--- patch-old/linux-0.12/kernel/blk_drv/hd.c	1992-01-16 06:39:10.000000000 +0000
++++ patch-new/linux-0.12/kernel/blk_drv/hd.c	2026-04-04 05:10:32.088837125 +0000
 @@ -62,10 +62,10 @@
  static int hd_sizes[5*MAX_HD] = {0, };
  
@@ -5518,9 +4087,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  }
  
  static int win_result(void)
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/blk_drv/ll_rw_blk.c patch-new/linux-0.12/kernel/blk_drv/ll_rw_blk.c
---- patch-old/linux-0.12/kernel/blk_drv/ll_rw_blk.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/blk_drv/ll_rw_blk.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/blk_drv/ll_rw_blk.c patch-new/linux-0.12/kernel/blk_drv/ll_rw_blk.c
+--- patch-old/linux-0.12/kernel/blk_drv/ll_rw_blk.c	1991-12-19 21:26:20.000000000 +0000
++++ patch-new/linux-0.12/kernel/blk_drv/ll_rw_blk.c	2026-04-04 05:10:32.088897667 +0000
 @@ -103,6 +103,7 @@
  	sti();
  }
@@ -5552,9 +4121,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  		request[i].dev = -1;
  		request[i].next = NULL;
  	}
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/Makefile patch-new/linux-0.12/kernel/chr_drv/Makefile
---- patch-old/linux-0.12/kernel/chr_drv/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/chr_drv/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/chr_drv/Makefile patch-new/linux-0.12/kernel/chr_drv/Makefile
+--- patch-old/linux-0.12/kernel/chr_drv/Makefile	1992-01-12 19:49:17.000000000 +0000
++++ patch-new/linux-0.12/kernel/chr_drv/Makefile	2026-04-04 05:10:32.089010501 +0000
 @@ -6,83 +6,62 @@
  # unless it's something special (ie not a .c file).
  #
@@ -5568,10 +4137,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	-finline-functions -mstring-insns -nostdinc -I../../include
 -CPP	=gcc -E -nostdinc -I../../include
 +include ../../Makefile.header
- 
++
 +CFLAGS	+= -I../../include
 +CPP	+= -I../../include
-+
+ 
  .c.s:
 -	$(CC) $(CFLAGS) \
 +	@$(CC) $(CFLAGS) \
@@ -5674,9 +4243,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
    ../../include/asm/io.h ../../include/asm/segment.h \
 -  ../../include/asm/system.h 
 +  ../../include/asm/system.h
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/console.c patch-new/linux-0.12/kernel/chr_drv/console.c
---- patch-old/linux-0.12/kernel/chr_drv/console.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/chr_drv/console.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/chr_drv/console.c patch-new/linux-0.12/kernel/chr_drv/console.c
+--- patch-old/linux-0.12/kernel/chr_drv/console.c	1992-01-12 20:28:33.000000000 +0000
++++ patch-new/linux-0.12/kernel/chr_drv/console.c	2026-04-04 05:10:32.089080959 +0000
 @@ -199,14 +199,14 @@
  				__asm__("cld\n\t"
  					"rep\n\t"
@@ -5825,19 +4394,19 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  		pos += 2;
  		x++;
  	}
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/keyboard.S patch-new/linux-0.12/kernel/chr_drv/keyboard.S
---- patch-old/linux-0.12/kernel/chr_drv/keyboard.S	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/chr_drv/keyboard.S	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/chr_drv/keyboard.S patch-new/linux-0.12/kernel/chr_drv/keyboard.S
+--- patch-old/linux-0.12/kernel/chr_drv/keyboard.S	1992-01-12 15:30:51.000000000 +0000
++++ patch-new/linux-0.12/kernel/chr_drv/keyboard.S	2026-04-04 05:10:32.089163751 +0000
 @@ -15,10 +15,13 @@
   * KBD_GR for German keyboards
   * KBD_FR for Frech keyboard
   */
 -#define KBD_FINNISH
- 
++
 +#define KBD_US
 +
 +#include <linux/config.h>
-+
+ 
  .text
 -.globl _keyboard_interrupt
 +.globl keyboard_interrupt
@@ -5911,9 +4480,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	popl %eax
  end_func:
  	ret
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/rs_io.s patch-new/linux-0.12/kernel/chr_drv/rs_io.s
---- patch-old/linux-0.12/kernel/chr_drv/rs_io.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/chr_drv/rs_io.s	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/chr_drv/rs_io.s patch-new/linux-0.12/kernel/chr_drv/rs_io.s
+--- patch-old/linux-0.12/kernel/chr_drv/rs_io.s	1992-01-08 06:27:08.000000000 +0000
++++ patch-new/linux-0.12/kernel/chr_drv/rs_io.s	2026-04-04 05:10:32.089256668 +0000
 @@ -11,7 +11,7 @@
   */
  
@@ -5967,9 +4536,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	addl $4,%esp
  	ret
  
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/chr_drv/tty_io.c patch-new/linux-0.12/kernel/chr_drv/tty_io.c
---- patch-old/linux-0.12/kernel/chr_drv/tty_io.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/chr_drv/tty_io.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/chr_drv/tty_io.c patch-new/linux-0.12/kernel/chr_drv/tty_io.c
+--- patch-old/linux-0.12/kernel/chr_drv/tty_io.c	1992-01-11 16:18:46.000000000 +0000
++++ patch-new/linux-0.12/kernel/chr_drv/tty_io.c	2026-04-04 05:10:32.089357669 +0000
 @@ -479,6 +479,6 @@
  		};
  	}
@@ -5979,9 +4548,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +	printk("\t%d virtual consoles\n\r", NR_CONSOLES);
 +	printk("\t%d pty's\n\r", NR_PTYS);
  }
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/exit.c patch-new/linux-0.12/kernel/exit.c
---- patch-old/linux-0.12/kernel/exit.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/exit.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/exit.c patch-new/linux-0.12/kernel/exit.c
+--- patch-old/linux-0.12/kernel/exit.c	1992-01-13 21:28:02.000000000 +0000
++++ patch-new/linux-0.12/kernel/exit.c	2026-04-04 05:10:32.089515670 +0000
 @@ -259,7 +259,7 @@
  	return(0);
  }
@@ -5991,9 +4560,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  {
  	struct task_struct *p;
  	int i;
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/fork.c patch-new/linux-0.12/kernel/fork.c
---- patch-old/linux-0.12/kernel/fork.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/fork.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/fork.c patch-new/linux-0.12/kernel/fork.c
+--- patch-old/linux-0.12/kernel/fork.c	1992-01-13 21:52:19.000000000 +0000
++++ patch-new/linux-0.12/kernel/fork.c	2026-04-04 05:10:32.089567087 +0000
 @@ -36,6 +36,7 @@
  	}
  }
@@ -6012,9 +4581,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	p->state = TASK_UNINTERRUPTIBLE;
  	p->pid = last_pid;
  	p->counter = p->priority;
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/math/Makefile patch-new/linux-0.12/kernel/math/Makefile
---- patch-old/linux-0.12/kernel/math/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/math/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/math/Makefile patch-new/linux-0.12/kernel/math/Makefile
+--- patch-old/linux-0.12/kernel/math/Makefile	1991-12-31 12:26:48.000000000 +0000
++++ patch-new/linux-0.12/kernel/math/Makefile	2026-04-04 05:10:32.089637337 +0000
 @@ -6,78 +6,35 @@
  # unless it's something special (ie not a .c file).
  #
@@ -6028,10 +4597,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	-finline-functions -mstring-insns -nostdinc -I../../include
 -CPP	=gcc -E -nostdinc -I../../include
 +include ../../Makefile.header
- 
++
 +CFLAGS	+= -I../../include
 +CPP	+= -I../../include
-+
+ 
  .c.s:
 -	$(CC) $(CFLAGS) \
 +	@$(CC) $(CFLAGS) \
@@ -6110,9 +4679,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -  ../../include/linux/head.h ../../include/linux/fs.h \
 -  ../../include/sys/types.h ../../include/linux/mm.h \
 -  ../../include/linux/kernel.h ../../include/signal.h 
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/math/ea.c patch-new/linux-0.12/kernel/math/ea.c
---- patch-old/linux-0.12/kernel/math/ea.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/math/ea.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/math/ea.c patch-new/linux-0.12/kernel/math/ea.c
+--- patch-old/linux-0.12/kernel/math/ea.c	1991-12-31 11:57:05.000000000 +0000
++++ patch-new/linux-0.12/kernel/math/ea.c	2026-04-04 05:10:32.089875838 +0000
 @@ -9,7 +9,6 @@
   */
  
@@ -6121,9 +4690,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  #include <linux/math_emu.h>
  #include <asm/segment.h>
  
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/panic.c patch-new/linux-0.12/kernel/panic.c
---- patch-old/linux-0.12/kernel/panic.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/panic.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/panic.c patch-new/linux-0.12/kernel/panic.c
+--- patch-old/linux-0.12/kernel/panic.c	1991-10-17 14:22:02.000000000 +0000
++++ patch-new/linux-0.12/kernel/panic.c	2026-04-04 05:10:32.090182173 +0000
 @@ -13,9 +13,9 @@
  
  void sys_sync(void);	/* it's really int */
@@ -6136,9 +4705,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	if (current == task[0])
  		printk("In swapper task - not syncing\n\r");
  	else
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/sched.c patch-new/linux-0.12/kernel/sched.c
---- patch-old/linux-0.12/kernel/sched.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/sched.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/sched.c patch-new/linux-0.12/kernel/sched.c
+--- patch-old/linux-0.12/kernel/sched.c	1992-01-12 15:30:13.000000000 +0000
++++ patch-new/linux-0.12/kernel/sched.c	2026-04-04 05:10:32.090296715 +0000
 @@ -17,7 +17,7 @@
  #include <asm/system.h>
  #include <asm/io.h>
@@ -6175,9 +4744,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  int sys_pause(void)
  {
  	current->state = TASK_INTERRUPTIBLE;
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/kernel/sys_call.s patch-new/linux-0.12/kernel/sys_call.s
---- patch-old/linux-0.12/kernel/sys_call.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/kernel/sys_call.s	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/kernel/sys_call.s patch-new/linux-0.12/kernel/sys_call.s
+--- patch-old/linux-0.12/kernel/sys_call.s	1992-01-06 21:10:59.000000000 +0000
++++ patch-new/linux-0.12/kernel/sys_call.s	2026-04-04 05:10:32.090492924 +0000
 @@ -68,9 +68,9 @@
   * Ok, I get parallel printer interrupts while using the floppy for some
   * strange reason. Urgel. Now I just ignore them.
@@ -6388,9 +4957,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	pushl %eax
  	movb $0x20,%al
  	outb %al,$0x20
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/lib/Makefile patch-new/linux-0.12/lib/Makefile
---- patch-old/linux-0.12/lib/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/lib/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/lib/Makefile patch-new/linux-0.12/lib/Makefile
+--- patch-old/linux-0.12/lib/Makefile	1991-12-02 03:16:05.000000000 +0000
++++ patch-new/linux-0.12/lib/Makefile	2026-04-04 05:10:32.090686425 +0000
 @@ -6,40 +6,36 @@
  # unless it's something special (ie not a .c file).
  #
@@ -6404,10 +4973,10 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -	-finline-functions -mstring-insns -nostdinc -I../include
 -CPP	=gcc -E -nostdinc -I../include
 +include ../Makefile.header
- 
++
 +CFLAGS	+= -I../include
 +CPP	+= -I../include
-+
+ 
  .c.s:
 -	$(CC) $(CFLAGS) \
 +	@$(CC) $(CFLAGS) \
@@ -6446,9 +5015,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  
  ### Dependencies:
  _exit.s _exit.o : _exit.c ../include/unistd.h ../include/sys/stat.h \
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/lib/_exit.c patch-new/linux-0.12/lib/_exit.c
---- patch-old/linux-0.12/lib/_exit.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/lib/_exit.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/lib/_exit.c patch-new/linux-0.12/lib/_exit.c
+--- patch-old/linux-0.12/lib/_exit.c	1991-10-02 14:16:29.000000000 +0000
++++ patch-new/linux-0.12/lib/_exit.c	2026-04-04 05:10:32.090732634 +0000
 @@ -7,7 +7,7 @@
  #define __LIBRARY__
  #include <unistd.h>
@@ -6458,9 +5027,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  {
  	__asm__("int $0x80"::"a" (__NR_exit),"b" (exit_code));
  }
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/lib/malloc.c patch-new/linux-0.12/lib/malloc.c
---- patch-old/linux-0.12/lib/malloc.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/lib/malloc.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/lib/malloc.c patch-new/linux-0.12/lib/malloc.c
+--- patch-old/linux-0.12/lib/malloc.c	1991-12-02 03:15:20.000000000 +0000
++++ patch-new/linux-0.12/lib/malloc.c	2026-04-04 05:10:32.091004885 +0000
 @@ -144,7 +144,7 @@
  	 * allocate a new one.
  	 */
@@ -6479,9 +5048,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  		if (!cp)
  			panic("Out of memory in kernel malloc()");
  		/* Set up the chain of free objects */
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/Makefile patch-new/linux-0.12/mm/Makefile
---- patch-old/linux-0.12/mm/Makefile	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/mm/Makefile	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/mm/Makefile patch-new/linux-0.12/mm/Makefile
+--- patch-old/linux-0.12/mm/Makefile	1992-01-12 19:49:22.000000000 +0000
++++ patch-new/linux-0.12/mm/Makefile	2026-04-04 05:10:32.091285970 +0000
 @@ -1,44 +1,37 @@
 -CC	=gcc
 -CFLAGS	=-O -Wall -fstrength-reduce -fcombine-regs -fomit-frame-pointer \
@@ -6490,13 +5059,13 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 -AR	=gar
 -LD	=gld
 -CPP	=gcc -E -nostdinc -I../include
- 
++
 +include ../Makefile.header
 +
 +LDFLAGS += -r
 +CFLAGS	+= -I../include
 +CPP	+= -I../include
-+
+ 
  .c.o:
 -	$(CC) $(CFLAGS) \
 +	@$(CC) $(CFLAGS) \
@@ -6547,9 +5116,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
 +  ../include/asm/system.h ../include/linux/sched.h \
 +  ../include/linux/head.h ../include/linux/fs.h ../include/linux/mm.h \
 +  ../include/linux/kernel.h
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/memory.c patch-new/linux-0.12/mm/memory.c
---- patch-old/linux-0.12/mm/memory.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/mm/memory.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/mm/memory.c patch-new/linux-0.12/mm/memory.c
+--- patch-old/linux-0.12/mm/memory.c	1992-01-13 22:57:04.000000000 +0000
++++ patch-new/linux-0.12/mm/memory.c	2026-04-04 05:10:32.091356512 +0000
 @@ -29,22 +29,22 @@
   */
  
@@ -6634,9 +5203,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  }
  
  void show_mem(void)
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/page.s patch-new/linux-0.12/mm/page.s
---- patch-old/linux-0.12/mm/page.s	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/mm/page.s	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/mm/page.s patch-new/linux-0.12/mm/page.s
+--- patch-old/linux-0.12/mm/page.s	1991-10-02 14:16:30.000000000 +0000
++++ patch-new/linux-0.12/mm/page.s	2026-04-04 05:10:32.091398470 +0000
 @@ -9,9 +9,9 @@
   * the real work is done in mm.c
   */
@@ -6661,9 +5230,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  2:	addl $8,%esp
  	pop %fs
  	pop %es
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/mm/swap.c patch-new/linux-0.12/mm/swap.c
---- patch-old/linux-0.12/mm/swap.c	2026-04-04 13:12:07
-+++ patch-new/linux-0.12/mm/swap.c	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/mm/swap.c patch-new/linux-0.12/mm/swap.c
+--- patch-old/linux-0.12/mm/swap.c	1992-01-13 15:46:41.000000000 +0000
++++ patch-new/linux-0.12/mm/swap.c	2026-04-04 05:10:32.091458679 +0000
 @@ -188,7 +188,7 @@
  		:"=a" (__res)
  		:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
@@ -6673,9 +5242,9 @@ diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit
  	if (__res >= HIGH_MEMORY)
  		goto repeat;
  	if (!__res && swap_out())
-diff -ruN --exclude=RCS --exclude=.git --exclude=hdc-0.12.img --exclude=.gdbinit --exclude=tags --exclude=*.map --exclude=bochs --exclude=calltree-2.3 patch-old/linux-0.12/tools/build.sh patch-new/linux-0.12/tools/build.sh
---- patch-old/linux-0.12/tools/build.sh	1970-01-01 08:00:00
-+++ patch-new/linux-0.12/tools/build.sh	2026-04-04 13:12:07
+diff -ruN '--exclude=RCS' '--exclude=.git' '--exclude=hdc-0.12.img' '--exclude=.gdbinit' '--exclude=tags' '--exclude=*.map' '--exclude=bochs' '--exclude=calltree-2.3' patch-old/linux-0.12/tools/build.sh patch-new/linux-0.12/tools/build.sh
+--- patch-old/linux-0.12/tools/build.sh	1970-01-01 00:00:00.000000000 +0000
++++ patch-new/linux-0.12/tools/build.sh	2026-04-04 05:10:32.092488850 +0000
 @@ -0,0 +1,44 @@
 +#!/bin/bash
 +# build.sh -- a shell version of build.c for the new bootsect.s & setup.s

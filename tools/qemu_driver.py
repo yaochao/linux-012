@@ -4,6 +4,7 @@ import argparse
 import os
 import shlex
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -197,6 +198,8 @@ def build_qemu_command(paths: DriverPaths, mode: str, qemu_bin: str) -> list[str
         if paths.platform.interactive_display:
             command.extend(["-display", paths.platform.interactive_display])
     else:
+        if paths.platform.monitor_kind == "unix":
+            command.append("-daemonize")
         command.extend(["-display", "none"])
     return command
 
@@ -364,10 +367,12 @@ def prepare_runtime_assets(paths: DriverPaths) -> None:
 
 
 def monitor_file_path(path: Path, root: Path) -> str:
-    try:
-        return path.relative_to(root).as_posix()
-    except ValueError:
-        return path.as_posix()
+    return path.as_posix()
+
+
+def hmp_string(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def send_keys(client: HMPClient, keys: list[str], delay: float = 0.15) -> None:
@@ -378,24 +383,143 @@ def send_keys(client: HMPClient, keys: list[str], delay: float = 0.15) -> None:
 
 def snapshot_screen(client: HMPClient, paths: DriverPaths) -> list[str]:
     dump_path = monitor_file_path(paths.vga_dump, paths.root)
-    client.command(f"pmemsave {VGA_ADDRESS} {VGA_BYTES} {dump_path}")
+    client.command(f"pmemsave {VGA_ADDRESS} {VGA_BYTES} {hmp_string(dump_path)}")
     data = paths.vga_dump.read_bytes()
     lines = decode_vga_text_buffer(data)
     paths.screen_text.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return lines
 
 
-def launch_qemu(paths: DriverPaths, qemu_bin: str, mode: str) -> subprocess.Popen[bytes]:
+def wait_for_pidfile(pidfile: Path, timeout: float) -> int:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if pidfile.exists():
+            text = pidfile.read_text(encoding="utf-8").strip()
+            if text:
+                return int(text)
+        time.sleep(0.1)
+    raise TimeoutError(f"Timed out waiting for pidfile: {pidfile}")
+
+
+class QemuHandle:
+    def __init__(
+        self,
+        *,
+        process: subprocess.Popen[bytes] | None,
+        pidfile: Path,
+        daemonized: bool,
+        pid: int | None = None,
+    ) -> None:
+        self.process = process
+        self.pidfile = pidfile
+        self.daemonized = daemonized
+        self.pid = pid
+
+    def _resolve_pid(self) -> int | None:
+        if self.pid is not None:
+            return self.pid
+        if not self.pidfile.exists():
+            return None
+        text = self.pidfile.read_text(encoding="utf-8").strip()
+        if not text:
+            return None
+        self.pid = int(text)
+        return self.pid
+
+    def poll(self) -> int | None:
+        if not self.daemonized:
+            if self.process is None:
+                return 1
+            return self.process.poll()
+        pid = self._resolve_pid()
+        if pid is None:
+            return 1
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return 1
+        return None
+
+    def terminate(self) -> None:
+        if not self.daemonized:
+            if self.process is not None:
+                self.process.terminate()
+            return
+        pid = self._resolve_pid()
+        if pid is None:
+            return
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+
+    def kill(self) -> None:
+        if not self.daemonized:
+            if self.process is not None:
+                self.process.kill()
+            return
+        pid = self._resolve_pid()
+        if pid is None:
+            return
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+
+    def wait(self, timeout: float | None = None) -> int:
+        if not self.daemonized:
+            if self.process is None:
+                return 1
+            return self.process.wait(timeout=timeout)
+        deadline = None if timeout is None else time.time() + timeout
+        while True:
+            result = self.poll()
+            if result is not None:
+                return result
+            if deadline is not None and time.time() >= deadline:
+                raise subprocess.TimeoutExpired("qemu-system-i386", timeout)
+            time.sleep(0.1)
+
+    @property
+    def returncode(self) -> int | None:
+        return self.poll()
+
+
+def launch_qemu(paths: DriverPaths, qemu_bin: str, mode: str) -> QemuHandle:
     command = build_qemu_command(paths=paths, mode=mode, qemu_bin=qemu_bin)
     if mode == "interactive":
-        return subprocess.Popen(command, cwd=paths.root)
+        return QemuHandle(
+            process=subprocess.Popen(command, cwd=paths.root),
+            pidfile=paths.pidfile,
+            daemonized=False,
+        )
     log_handle = paths.qemu_log.open("wb")
-    return subprocess.Popen(
-        command,
-        cwd=paths.root,
-        stdout=log_handle,
-        stderr=subprocess.STDOUT,
-    )
+    try:
+        if "-daemonize" in command:
+            completed = subprocess.run(
+                command,
+                cwd=paths.root,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(f"QEMU exited early with status {completed.returncode}")
+            return QemuHandle(
+                process=None,
+                pidfile=paths.pidfile,
+                daemonized=True,
+                pid=wait_for_pidfile(paths.pidfile, timeout=5.0),
+            )
+        process = subprocess.Popen(
+            command,
+            cwd=paths.root,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+        )
+        return QemuHandle(process=process, pidfile=paths.pidfile, daemonized=False)
+    finally:
+        log_handle.close()
 
 
 def drive_to_shell(
@@ -403,7 +527,7 @@ def drive_to_shell(
     qemu_bin: str,
     mode: str,
     send_ls: bool,
-) -> tuple[int, str | None, subprocess.Popen[bytes] | None]:
+) -> tuple[int, str | None, QemuHandle | None]:
     prepare_runtime_assets(paths)
     process = launch_qemu(paths=paths, qemu_bin=qemu_bin, mode=mode)
     client = HMPClient(paths)

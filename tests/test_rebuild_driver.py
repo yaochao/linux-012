@@ -42,7 +42,14 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertIn("rebuild/patches/linux-0.12", text)
         self.assertIn("bootimage-0.12-hd", text)
         self.assertIn("guestfish", text)
+        self.assertIn("/tmp/linux-012-rebuild-work", text)
         self.assertNotIn("mount -t minix", text)
+
+    def test_build_script_formats_minix_v1_with_14_character_names(self) -> None:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "rebuild" / "container" / "build_images.sh").read_text()
+
+        self.assertIn("mkfs.minix -1 -n14", text)
 
     def test_capture_script_uses_guestfish_for_minix_export(self) -> None:
         root = pathlib.Path(__file__).resolve().parents[1]
@@ -58,6 +65,13 @@ class RebuildDriverTest(unittest.TestCase):
 
         self.assertIn("libguestfs-tools", text)
         self.assertIn("linux-image-kvm", text)
+
+    def test_modern_gcc_patch_disables_pie_for_kernel_objects(self) -> None:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "rebuild" / "patches" / "linux-0.12" / "0003-modern-inline-semantics.patch").read_text()
+
+        self.assertIn("-fno-pie", text)
+        self.assertIn("-fno-pic", text)
 
 
 if __name__ == "__main__":
