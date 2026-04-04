@@ -26,6 +26,18 @@ class ScriptTest(unittest.TestCase):
         self.assertIn("tools/qemu_driver.py", text)
         self.assertIn("verify", text)
 
+    def test_windows_verify_powershell_script_calls_python_driver(self) -> None:
+        text = (ROOT / "scripts" / "verify.ps1").read_text()
+
+        self.assertIn("tools/qemu_driver.py", text)
+        self.assertIn("verify", text)
+
+    def test_windows_run_batch_script_delegates_to_powershell(self) -> None:
+        text = (ROOT / "scripts" / "run.cmd").read_text()
+
+        self.assertIn("powershell", text.lower())
+        self.assertIn("run.ps1", text)
+
     def test_driver_supports_dry_run(self) -> None:
         result = subprocess.run(
             [sys.executable, str(ROOT / "tools" / "qemu_driver.py"), "verify", "--dry-run"],

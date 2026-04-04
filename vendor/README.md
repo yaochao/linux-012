@@ -19,3 +19,5 @@ This directory stores project-owned historical assets so the repo can run withou
 - `tools/qemu_driver.py` pads it to a full 1.44MB floppy image in `out/run/boot.img` or `out/verify/boot.img` before QEMU starts.
 - `hdc-0.12.img` is mounted as `hda`.
 - QEMU always runs with `-snapshot`, so the vendored disk image remains unchanged across runs.
+- macOS and Ubuntu 22.04 talk to the QEMU monitor through a repo-local Unix socket.
+- Windows 10 uses a localhost TCP monitor endpoint so the same Python automation can drive the guest without Unix socket support.
