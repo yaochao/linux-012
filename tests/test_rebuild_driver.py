@@ -15,6 +15,7 @@ from rebuild.driver import (
     fetch_release_images,
     parse_args,
     prepare_release_assets,
+    run_bootstrap_host,
     sync_repo_images,
     verify_release_readback,
     verify_repo_runtime,
@@ -126,6 +127,23 @@ class RebuildDriverTest(unittest.TestCase):
         self.assertEqual("verify", calls[0][0][-1])
         self.assertEqual(str(paths.repo_boot_image), calls[0][1]["LINUX012_BOOT_SOURCE_IMAGE"])
         self.assertEqual(str(paths.repo_runtime_hard_disk_image), calls[0][1]["LINUX012_HARD_DISK_IMAGE"])
+
+    def test_run_bootstrap_host_fails_when_docker_daemon_is_unavailable(self) -> None:
+        root = pathlib.Path("/tmp/linux-012")
+        paths = BuildPaths.from_root(root)
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], *, cwd: pathlib.Path, env=None) -> int:
+            calls.append(command)
+            if command[:2] == ["docker", "info"]:
+                return 1
+            return 0
+
+        with mock.patch("rebuild.driver.run_command", side_effect=fake_run):
+            self.assertEqual(1, run_bootstrap_host(paths))
+
+        self.assertEqual("bootstrap-host", calls[0][-1])
+        self.assertEqual(["docker", "info", "--format", "{{.ServerVersion}}"], calls[1])
 
     def test_sync_repo_images_compresses_repo_hard_disk_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

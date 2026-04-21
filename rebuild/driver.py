@@ -474,7 +474,7 @@ def run_bootstrap_host(paths: BuildPaths) -> int:
     )
     if qemu_status != 0:
         return qemu_status
-    return run_command(["docker", "--version"], cwd=paths.root)
+    return run_command(["docker", "info", "--format", "{{.ServerVersion}}"], cwd=paths.root)
 
 
 def run_runtime(paths: BuildPaths, mode: str) -> int:
